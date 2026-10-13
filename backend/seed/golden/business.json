@@ -1,0 +1,17 @@
+{
+  "accounts": [
+    {
+      "currency": "USD",
+      "name": "Operating Checking",
+      "opening_balance": 3107216,
+      "type": "checking"
+    }
+  ],
+  "business": {
+    "base_currency": "USD",
+    "industry": "Specialty coffee roasting",
+    "min_cash_buffer": 500000,
+    "name": "Ember & Oak Coffee Roasters",
+    "settings": {}
+  }
+}

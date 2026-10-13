@@ -1,0 +1,98 @@
+[
+  {
+    "is_allowed_payee": false,
+    "kind": "customer",
+    "name": "Harbor Lane Café",
+    "normalized_name": "HARBOR LANE CAFE"
+  },
+  {
+    "is_allowed_payee": false,
+    "kind": "customer",
+    "name": "Copperleaf Bakery",
+    "normalized_name": "COPPERLEAF BAKERY"
+  },
+  {
+    "is_allowed_payee": false,
+    "kind": "customer",
+    "name": "Juniper Street Diner",
+    "normalized_name": "JUNIPER STREET DINER"
+  },
+  {
+    "is_allowed_payee": false,
+    "kind": "customer",
+    "name": "Tidewater Co-work",
+    "normalized_name": "TIDEWATER COWORK"
+  },
+  {
+    "is_allowed_payee": false,
+    "kind": "customer",
+    "name": "Little Fern Bookshop Café",
+    "normalized_name": "LITTLE FERN BOOKSHOP"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Verde Green Coffee Imports",
+    "normalized_name": "VERDE GREEN COFFEE IMPORTS"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "QuickShip Logistics",
+    "normalized_name": "QUICKSHIP LOGISTICS"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Northfold Packaging",
+    "normalized_name": "NORTHFOLD PACKAGING"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Crestline Equipment Finance",
+    "normalized_name": "CRESTLINE EQUIPMENT FINANCE"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Maplewood Property Group",
+    "normalized_name": "MAPLEWOOD PROPERTY GROUP"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Paystream Payroll",
+    "normalized_name": "PAYSTREAM PAYROLL"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Riverbend Utilities",
+    "normalized_name": "RIVERBEND UTILITIES"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Quillbook Accounting",
+    "normalized_name": "QUILLBOOK ACCOUNTING"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Designly Pro",
+    "normalized_name": "DESIGNLY PRO"
+  },
+  {
+    "is_allowed_payee": true,
+    "kind": "supplier",
+    "name": "Designly Team",
+    "normalized_name": "DESIGNLY TEAM"
+  },
+  {
+    "is_allowed_payee": false,
+    "kind": "both",
+    "name": "CloudPOS",
+    "normalized_name": "CLOUDPOS"
+  }
+]

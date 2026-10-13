@@ -34,6 +34,8 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - P1–P4 each detected with correct type, severity, non-zero impact and evidence_ids.
 - Week 6 closing < buffer; what-if "INV-1042 paid on due date" changes week-6 result.
 - Every ForecastLine has source_ids; sum of lines == closing balance.
+- Overdue receivables whose `due_date + avg_days_late` is already past (e.g. INV-1042: Aug 17 + 28 = Sep 14) are handled explicitly — placed in week 1 with reduced probability or flagged at-risk; never dropped silently, never placed in a past week. Test covers INV-1042.
+- P4 calibration: week-6 close ≈ −$2k; what-if collecting INV-1042 lifts it to ≈ +$2.8k (still below buffer). Tune `TARGET_CASH_AT_DEMO_TODAY` in `seed/generate_golden.py`.
 
 ## Phase 3 — Policy gate, audit log, sandbox, auth  *(Oct 16)*
 - JWT auth + RBAC (owner/accountant/viewer).

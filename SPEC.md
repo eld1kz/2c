@@ -133,7 +133,7 @@ All money stored as integer **minor units** (cents) + `currency` (ISO 4217). Nev
 Categories: `revenue_retail, revenue_wholesale, cogs_beans, cogs_packaging, rent, utilities, payroll, software, equipment, logistics, marketing, fees, taxes, transfer, other`.
 
 ### 6.3 Recurring detection
-Group by (counterparty, category). ≥3 occurrences, amount within ±10% of median, interval std small and median interval ≈ 7/30/91 days → RecurringSeries with cadence and next_expected_date.
+Group by (counterparty, category). ≥3 occurrences (≥2 for quarterly, since 6 months of history holds at most 2–3 quarterly payments), amount within ±10% of median, interval std small and median interval ≈ 7/30/91 days → RecurringSeries with cadence and next_expected_date.
 
 ### 6.4 13-week forecast
 - Opening = sum of account balances at `DEMO_TODAY`.
