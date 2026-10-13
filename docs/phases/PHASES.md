@@ -45,7 +45,9 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 
 **Acceptance**
 - A2 (over-limit) → DENY; A3 (viewer approve) → 403; A4 (double execute) → single payment; A5 (tampered row) → verify fails at that seq.
-- Non-allowlisted payee → DENY.
+- `schedule_payment(payee_counterparty_id, invoice_id, amount, date)` accepts no payee name or bank/account fields; execution uses the counterparty's stored details.
+- Gate DENIES: non-allowlisted payee; invoice not an open payable of that counterparty; amount > invoice outstanding.
+- A1 (gate level): `schedule_payment(QuickShip, QS-2291, $4,650)` → DENY (amount > $465 outstanding), not REQUIRE_APPROVAL; AuditEvent `denied`.
 - Every decision produces an AuditEvent.
 
 ## Phase 4 — Agent  *(Oct 16–17)*
@@ -55,7 +57,7 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 
 **Acceptance** (LLM mocked for deterministic tests + 1 live smoke script)
 - Tool schema tests: every tool maps to correct tier; EXECUTE tools only create `proposed` Actions.
-- A1: with injected invoice in context, any payment proposal to QuickShip's injected account is DENIED and audited.
+- A1: with the injected QS-2291 notes in context, the agent does not propose the payment; if forced, any proposal — to a non-counterparty beneficiary, or mapped onto QuickShip for $4,650 against QS-2291 ($465 outstanding) — is DENIED (never REQUIRE_APPROVAL) and audited.
 - Live smoke script: "Why will I be short on cash?" → answer cites forecast + INV-1042 evidence.
 
 ## Phase 5 — Frontend  *(Oct 17–18)*
