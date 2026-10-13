@@ -19,4 +19,4 @@
 - All seeded demo users share one known password (`seed/load.py`); demo data only.
 - LLM categorization can still mislabel; mitigated by confidence threshold + human review, not eliminated.
 - Forecast is heuristic (historical behavior); not a guarantee.
-- Financing catalog is simulated, not real offers.
+- Financing catalog is simulated, not real offers. Every ranking carries a "not financial advice" disclaimer (`engine/financing.py`); options are suggestions only and nothing executes without an approved Action.

@@ -1,7 +1,7 @@
 """Load golden data, demo users and the default Policy into the database.
 
 Bank transactions go through the real ingestion pipeline (parse → link → match → categorize),
-then recurring series, counterparty stats and the base forecast are computed. Run after `alembic upgrade head`: `python -m seed.load`
+then recurring series, counterparty stats, the base forecast and insights are computed. Run after `alembic upgrade head`: `python -m seed.load`
 """
 
 import json
@@ -30,6 +30,7 @@ from app.db.models import (
 from app.engine.categorize import DEFAULT_KEYWORD_RULES, Classifier, NullClassifier
 from app.engine.counterparty_stats import refresh_counterparty_stats
 from app.engine.forecast import project, save_forecast
+from app.engine.insights.registry import refresh_insights
 from app.engine.recurring import detect_recurring
 from app.engine.snapshot import load_snapshot
 from app.ingestion.pipeline import ingest_csv
@@ -115,7 +116,10 @@ def load(session: Session, golden_dir: Path = GOLDEN_DIR, classifier: Classifier
     today = get_settings().demo_today
     detect_recurring(session, business.id, today)
     refresh_counterparty_stats(session, business.id)
-    save_forecast(session, business.id, project(load_snapshot(session, business.id, today)))
+    snapshot = load_snapshot(session, business.id, today)
+    forecast = project(snapshot)
+    save_forecast(session, business.id, forecast)
+    refresh_insights(session, snapshot, forecast)
     return business
 
 
