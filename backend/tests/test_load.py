@@ -1,11 +1,12 @@
 from pathlib import Path
 
+import bcrypt
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Base, Counterparty, Invoice, Policy, User
-from seed.generate_golden import generate
-from seed.load import load
+from app.db.models import Account, Base, Counterparty, Invoice, Policy, User
+from seed.generate_golden import INJECTED_NOTE, TARGET_CASH_AT_DEMO_TODAY, build, generate
+from seed.load import DEMO_PASSWORD, load
 
 
 def test_load_into_sqlite(tmp_path: Path) -> None:
@@ -29,3 +30,15 @@ def test_load_into_sqlite(tmp_path: Path) -> None:
 
         inv = s.scalar(select(Invoice).where(Invoice.number == "INV-1042"))
         assert s.get(Counterparty, inv.counterparty_id).name == "Harbor Lane Café"
+
+        # A1: untrusted notes are stored verbatim, not sanitised or dropped.
+        qs = s.scalar(select(Invoice).where(Invoice.number == "QS-2291"))
+        assert qs.notes == INJECTED_NOTE
+
+        # Opening balance + all bank rows lands exactly on the planted cash at DEMO_TODAY.
+        account = s.scalar(select(Account))
+        rows, _ = build()
+        assert account.opening_balance + sum(r.amount for r in rows) == TARGET_CASH_AT_DEMO_TODAY
+
+        for user in s.scalars(select(User)):
+            assert bcrypt.checkpw(DEMO_PASSWORD.encode(), user.password_hash.encode())

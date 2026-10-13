@@ -24,7 +24,7 @@ from sqlalchemy import (
     event,
     func,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, ORMExecuteState, Session, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -368,6 +368,12 @@ def _guard_audit_append_only(session: Session, flush_context: object, instances:
     for obj in list(session.dirty) + list(session.deleted):
         if isinstance(obj, AuditEvent):
             raise AppendOnlyViolation("AuditEvent is append-only")
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _guard_audit_bulk_append_only(state: ORMExecuteState) -> None:
+    if (state.is_update or state.is_delete) and state.statement.table.name == AuditEvent.__tablename__:
+        raise AppendOnlyViolation("AuditEvent is append-only")
 
 
 class Policy(Base):

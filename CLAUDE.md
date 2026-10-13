@@ -21,6 +21,12 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 - Update `docs/threat-model.md` whenever you add a security-relevant component.
 - Prefer small, readable modules. Type hints everywhere. Pydantic schemas for all API I/O.
 
+## Git
+- Claude handles commits. Commit after each verified milestone (tests green), not after every file.
+- Message format: `phase N: <short summary>`, e.g. `phase 1: csv ingestion + categorization`.
+- Never commit `.env`, `.venv`, `node_modules` or secrets. Check `git status` before each commit.
+- Never push unless asked.
+
 ## Commands
 - Backend: `cd backend && uvicorn app.main:app --reload`
 - Tests: `cd backend && pytest -q`

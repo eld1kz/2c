@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Float, Numeric, create_engine, inspect
+from sqlalchemy import Float, Numeric, create_engine, delete, inspect, update
 from sqlalchemy.orm import Session
 
 from app.db.models import AppendOnlyViolation, AuditEvent, Base
@@ -50,6 +50,15 @@ def test_audit_event_delete_blocked(session: Session) -> None:
     session.delete(ev)
     with pytest.raises(AppendOnlyViolation):
         session.flush()
+
+
+def test_audit_event_bulk_update_and_delete_blocked(session: Session) -> None:
+    session.add(_event())
+    session.commit()
+    with pytest.raises(AppendOnlyViolation):
+        session.execute(update(AuditEvent).values(actor="tampered"))
+    with pytest.raises(AppendOnlyViolation):
+        session.execute(delete(AuditEvent))
 
 
 def test_no_float_money_columns() -> None:
