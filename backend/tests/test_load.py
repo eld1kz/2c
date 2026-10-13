@@ -4,7 +4,7 @@ import bcrypt
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Account, Base, Counterparty, Invoice, Policy, User
+from app.db.models import Account, Base, CategoryRule, Counterparty, Invoice, Policy, RecurringSeries, Transaction, User
 from seed.generate_golden import INJECTED_NOTE, TARGET_CASH_AT_DEMO_TODAY, build, generate
 from seed.load import DEMO_PASSWORD, load
 
@@ -39,6 +39,13 @@ def test_load_into_sqlite(tmp_path: Path) -> None:
         account = s.scalar(select(Account))
         rows, _ = build()
         assert account.opening_balance + sum(r.amount for r in rows) == TARGET_CASH_AT_DEMO_TODAY
+
+        # Bank rows arrive through the ingestion pipeline, then recurring detection runs.
+        txs = list(s.scalars(select(Transaction)))
+        assert len(txs) == len(rows)
+        assert account.opening_balance + sum(t.amount for t in txs) == TARGET_CASH_AT_DEMO_TODAY
+        assert {r.kind for r in s.scalars(select(CategoryRule))} == {"keyword", "name"}
+        assert s.scalars(select(RecurringSeries)).first() is not None
 
         for user in s.scalars(select(User)):
             assert bcrypt.checkpw(DEMO_PASSWORD.encode(), user.password_hash.encode())

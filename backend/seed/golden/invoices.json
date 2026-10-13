@@ -8,7 +8,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 37,
+        "quantity": 36,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -16,7 +16,7 @@
     "notes": null,
     "number": "INV-1024",
     "status": "paid",
-    "total": 222000
+    "total": 216000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -46,7 +46,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 33,
+        "quantity": 28,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -54,7 +54,7 @@
     "notes": null,
     "number": "INV-1025",
     "status": "paid",
-    "total": 198000
+    "total": 168000
   },
   {
     "counterparty": "Tidewater Co-work",
@@ -65,7 +65,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 26,
+        "quantity": 22,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -73,7 +73,7 @@
     "notes": null,
     "number": "INV-1026",
     "status": "paid",
-    "total": 156000
+    "total": 132000
   },
   {
     "counterparty": "Harbor Lane Café",
@@ -84,7 +84,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 78,
+        "quantity": 79,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -92,7 +92,7 @@
     "notes": null,
     "number": "INV-1027",
     "status": "paid",
-    "total": 468000
+    "total": 474000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -122,7 +122,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 22,
+        "quantity": 17,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -130,7 +130,7 @@
     "notes": null,
     "number": "INV-1028",
     "status": "paid",
-    "total": 132000
+    "total": 102000
   },
   {
     "counterparty": "QuickShip Logistics",
@@ -143,13 +143,13 @@
         "description": "Wholesale delivery services",
         "quantity": 1,
         "sku": null,
-        "unit_price": 40724
+        "unit_price": 51697
       }
     ],
     "notes": "Delivery services, April 2026.",
     "number": "QS-2286",
     "status": "paid",
-    "total": 40724
+    "total": 51697
   },
   {
     "counterparty": "Copperleaf Bakery",
@@ -198,7 +198,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 30,
+        "quantity": 35,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -206,7 +206,7 @@
     "notes": null,
     "number": "INV-1030",
     "status": "paid",
-    "total": 180000
+    "total": 210000
   },
   {
     "counterparty": "Tidewater Co-work",
@@ -217,7 +217,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 23,
+        "quantity": 26,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -225,7 +225,7 @@
     "notes": null,
     "number": "INV-1031",
     "status": "paid",
-    "total": 138000
+    "total": 156000
   },
   {
     "counterparty": "Harbor Lane Café",
@@ -236,7 +236,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 81,
+        "quantity": 82,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -244,7 +244,7 @@
     "notes": null,
     "number": "INV-1032",
     "status": "paid",
-    "total": 486000
+    "total": 492000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -295,13 +295,13 @@
         "description": "Wholesale delivery services",
         "quantity": 1,
         "sku": null,
-        "unit_price": 44658
+        "unit_price": 38241
       }
     ],
     "notes": "Delivery services, May 2026.",
     "number": "QS-2287",
     "status": "paid",
-    "total": 44658
+    "total": 38241
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -331,7 +331,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 37,
+        "quantity": 42,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -339,7 +339,7 @@
     "notes": null,
     "number": "INV-1034",
     "status": "paid",
-    "total": 222000
+    "total": 252000
   },
   {
     "counterparty": "Juniper Street Diner",
@@ -350,7 +350,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 33,
+        "quantity": 29,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -358,7 +358,7 @@
     "notes": null,
     "number": "INV-1035",
     "status": "paid",
-    "total": 198000
+    "total": 174000
   },
   {
     "counterparty": "Tidewater Co-work",
@@ -369,7 +369,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 25,
+        "quantity": 27,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -377,7 +377,7 @@
     "notes": null,
     "number": "INV-1036",
     "status": "paid",
-    "total": 150000
+    "total": 162000
   },
   {
     "counterparty": "Harbor Lane Café",
@@ -388,7 +388,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 74,
+        "quantity": 79,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -396,7 +396,7 @@
     "notes": null,
     "number": "INV-1037",
     "status": "paid",
-    "total": 444000
+    "total": 474000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -426,7 +426,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 22,
+        "quantity": 20,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -434,7 +434,7 @@
     "notes": null,
     "number": "INV-1038",
     "status": "paid",
-    "total": 132000
+    "total": 120000
   },
   {
     "counterparty": "QuickShip Logistics",
@@ -447,13 +447,13 @@
         "description": "Wholesale delivery services",
         "quantity": 1,
         "sku": null,
-        "unit_price": 45956
+        "unit_price": 39528
       }
     ],
     "notes": "Delivery services, June 2026.",
     "number": "QS-2288",
     "status": "paid",
-    "total": 45956
+    "total": 39528
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -483,7 +483,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 36,
+        "quantity": 43,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -491,7 +491,7 @@
     "notes": null,
     "number": "INV-1039",
     "status": "paid",
-    "total": 216000
+    "total": 258000
   },
   {
     "counterparty": "Juniper Street Diner",
@@ -502,7 +502,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 33,
+        "quantity": 29,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -510,7 +510,7 @@
     "notes": null,
     "number": "INV-1040",
     "status": "paid",
-    "total": 198000
+    "total": 174000
   },
   {
     "counterparty": "Tidewater Co-work",
@@ -521,7 +521,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 23,
+        "quantity": 25,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -529,7 +529,7 @@
     "notes": null,
     "number": "INV-1041",
     "status": "paid",
-    "total": 138000
+    "total": 150000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -578,7 +578,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 18,
+        "quantity": 23,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -586,7 +586,7 @@
     "notes": null,
     "number": "INV-1043",
     "status": "paid",
-    "total": 108000
+    "total": 138000
   },
   {
     "counterparty": "QuickShip Logistics",
@@ -599,13 +599,13 @@
         "description": "Wholesale delivery services",
         "quantity": 1,
         "sku": null,
-        "unit_price": 45886
+        "unit_price": 50346
       }
     ],
     "notes": "Delivery services, July 2026.",
     "number": "QS-2289",
     "status": "paid",
-    "total": 45886
+    "total": 50346
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -635,7 +635,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 43,
+        "quantity": 39,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -643,7 +643,7 @@
     "notes": null,
     "number": "INV-1044",
     "status": "paid",
-    "total": 258000
+    "total": 234000
   },
   {
     "counterparty": "Juniper Street Diner",
@@ -654,7 +654,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 34,
+        "quantity": 31,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -662,7 +662,7 @@
     "notes": null,
     "number": "INV-1045",
     "status": "paid",
-    "total": 204000
+    "total": 186000
   },
   {
     "counterparty": "Tidewater Co-work",
@@ -673,7 +673,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 24,
+        "quantity": 25,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -681,7 +681,7 @@
     "notes": null,
     "number": "INV-1046",
     "status": "paid",
-    "total": 144000
+    "total": 150000
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -711,7 +711,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 77,
+        "quantity": 81,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -719,7 +719,7 @@
     "notes": null,
     "number": "INV-1047",
     "status": "overdue",
-    "total": 462000
+    "total": 486000
   },
   {
     "counterparty": "Little Fern Bookshop Café",
@@ -730,7 +730,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 23,
+        "quantity": 18,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -738,7 +738,7 @@
     "notes": null,
     "number": "INV-1048",
     "status": "paid",
-    "total": 138000
+    "total": 108000
   },
   {
     "counterparty": "QuickShip Logistics",
@@ -751,13 +751,13 @@
         "description": "Wholesale delivery services",
         "quantity": 1,
         "sku": null,
-        "unit_price": 41502
+        "unit_price": 51905
       }
     ],
     "notes": "Delivery services, August 2026.",
     "number": "QS-2290",
     "status": "paid",
-    "total": 41502
+    "total": 51905
   },
   {
     "counterparty": "Verde Green Coffee Imports",
@@ -844,7 +844,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 27,
+        "quantity": 28,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -852,7 +852,7 @@
     "notes": null,
     "number": "INV-1051",
     "status": "open",
-    "total": 162000
+    "total": 168000
   },
   {
     "counterparty": "Harbor Lane Café",
@@ -863,7 +863,7 @@
     "lines": [
       {
         "description": "House Blend, 5 lb bag",
-        "quantity": 74,
+        "quantity": 75,
         "sku": "WH-HOUSE-5LB",
         "unit_price": 6000
       }
@@ -871,7 +871,7 @@
     "notes": null,
     "number": "INV-1052",
     "status": "open",
-    "total": 444000
+    "total": 450000
   },
   {
     "counterparty": "Verde Green Coffee Imports",

@@ -53,7 +53,7 @@ def test_generator_is_deterministic(tmp_path: Path) -> None:
     generate(tmp_path / "a")
     generate(tmp_path / "b")
     a, b = digest(tmp_path / "a"), digest(tmp_path / "b")
-    assert len(a) == 5
+    assert len(a) == 6
     assert a == b
 
 

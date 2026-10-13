@@ -1,0 +1,14 @@
+[
+  {
+    "category": "software",
+    "direction": "out",
+    "kind": "name",
+    "pattern": "DESIGNLY PRO"
+  },
+  {
+    "category": "software",
+    "direction": "out",
+    "kind": "name",
+    "pattern": "DESIGNLY TEAM"
+  }
+]

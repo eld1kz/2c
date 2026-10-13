@@ -88,6 +88,22 @@ class CategorySource(StrEnum):
     human = "human"
 
 
+class RuleKind(StrEnum):
+    keyword = "keyword"  # whole-token phrase anywhere in the normalized description
+    name = "name"  # matched counterparty's normalized_name
+
+
+class RuleDirection(StrEnum):
+    inflow = "in"
+    outflow = "out"
+    any = "any"
+
+
+class RuleSource(StrEnum):
+    seed = "seed"
+    human = "human"
+
+
 class InvoiceDirection(StrEnum):
     receivable = "receivable"
     payable = "payable"
@@ -240,6 +256,21 @@ class Transaction(Base):
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
     source_file: Mapped[str] = mapped_column(String(255))
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id"))
+
+
+class CategoryRule(Base):
+    """Categorization rules (SPEC §6.2), applied in ascending priority; first match wins."""
+
+    __tablename__ = "category_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"))
+    kind: Mapped[RuleKind] = mapped_column(_enum(RuleKind))
+    pattern: Mapped[str] = mapped_column(String(200))
+    direction: Mapped[RuleDirection] = mapped_column(_enum(RuleDirection))
+    category: Mapped[Category] = mapped_column(_enum(Category))
+    source: Mapped[RuleSource] = mapped_column(_enum(RuleSource))
+    priority: Mapped[int] = mapped_column(Integer)
 
 
 class Invoice(Base):
