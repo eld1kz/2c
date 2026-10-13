@@ -25,6 +25,7 @@ DEFAULT_KEYWORD_RULES: list[tuple[str, RuleDirection, Category]] = [
     ("GREEN COFFEE", RuleDirection.outflow, Category.cogs_beans),
     ("LOGISTICS", RuleDirection.outflow, Category.logistics),
     ("SUBSCRIPTION", RuleDirection.outflow, Category.software),
+    ("TAX", RuleDirection.outflow, Category.taxes),
 ]
 
 

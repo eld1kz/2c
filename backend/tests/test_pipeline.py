@@ -23,11 +23,11 @@ from tests.fakes import FakeClassifier
 def test_at_least_90pct_categorized_by_rules_or_llm(golden_db: tuple[Session, Business, FakeClassifier]) -> None:
     session, _, _ = golden_db
     txs = list(session.scalars(select(Transaction)))
-    assert len(txs) == 305
+    assert len(txs) == 306
     categorized = [t for t in txs if t.category_source in (CategorySource.rule, CategorySource.llm)]
     assert len(categorized) / len(txs) >= 0.9
-    assert len(categorized) == 305
-    assert sum(t.category_source == CategorySource.rule for t in txs) == 299
+    assert len(categorized) == 306
+    assert sum(t.category_source == CategorySource.rule for t in txs) == 300
 
 
 def test_cash_reconciles(golden_db: tuple[Session, Business, FakeClassifier]) -> None:

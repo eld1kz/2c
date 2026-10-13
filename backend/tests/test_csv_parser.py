@@ -30,7 +30,7 @@ def test_q2_signed_amount_format() -> None:
 
 def test_q3_debit_credit_format() -> None:
     rows = parse_csv("x.csv", _golden(Q3_FILE))
-    assert len(rows) == 157
+    assert len(rows) == 158
     assert rows[0].date == date(2026, 7, 1) and rows[0].amount > 0  # credit
     assert rows[1].amount == -450_000  # debit shown unsigned in the file
 

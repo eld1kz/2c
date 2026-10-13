@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.db.models import Base, Business
+from app.engine.categorize import NullClassifier
 from seed.load import load
 from tests.fakes import FakeClassifier
 
@@ -34,3 +35,13 @@ def golden_db() -> Iterator[tuple[Session, Business, FakeClassifier]]:
     with Session(engine) as session:
         business = load(session, classifier=classifier)
         yield session, business, classifier
+
+
+@pytest.fixture(params=["null", "llm"])
+def golden_path(request: pytest.FixtureRequest) -> Iterator[tuple[str, Session, Business]]:
+    """Golden data on both classifier paths: no LLM (Quillbook → review) and mocked LLM (Quillbook → series)."""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    classifier = NullClassifier() if request.param == "null" else FakeClassifier()
+    with Session(engine) as session:
+        yield request.param, session, load(session, classifier=classifier)

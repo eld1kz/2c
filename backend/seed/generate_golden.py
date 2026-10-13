@@ -21,9 +21,9 @@ END = date(2026, 9, 30)
 DEMO_TODAY = DEFAULT_DEMO_TODAY
 CURRENCY = "USD"
 
-# Cash on hand at DEMO_TODAY; opening balance is derived from it. Calibrated in Phase 2
-# so forecast week 6 closes ≈ −$2k (P4).
-TARGET_CASH_AT_DEMO_TODAY = 1_500_000
+# Cash on hand at DEMO_TODAY; opening balance is derived from it. Calibrated in Phase 2 so the
+# forecast's week 6 closes ≈ −$2k and "collect INV-1042" lifts it to ≈ +$2.8k (P4).
+TARGET_CASH_AT_DEMO_TODAY = 865_000
 MIN_HISTORY_BALANCE = 300_000
 MIN_CASH_BUFFER = 500_000
 
@@ -38,6 +38,10 @@ VERDE_QTY_LB = 300
 VERDE_PRICES = [620, 620, 620, 620, 620, 638, 650, 664, 676, 690, 702, 718, 732]
 LEASE_DATES = [date(2026, 5, 8), date(2026, 8, 7)]  # next: 2026-11-06 = forecast week 6
 LEASE_AMOUNT = 1_200_000
+# Annual property tax: a one-off in the history (no series, no forecast line). Keeps the history
+# balance above MIN_HISTORY_BALANCE at the Phase 2 calibrated cash.
+PROPERTY_TAX_DATE = date(2026, 9, 15)
+PROPERTY_TAX_AMOUNT = 600_000
 # Apr–Sep utility bills: summer peak, each within ±10% of the median so recurring detection finds them.
 UTILITY_BILLS = [58_400, 57_900, 61_200, 64_800, 65_300, 60_700]
 
@@ -174,6 +178,8 @@ def build(seed: int = SEED) -> tuple[list[Row], list[dict]]:
     # P4: quarterly equipment lease.
     for d in LEASE_DATES:
         rows.append(Row(d, "CRESTLINE EQUIP FIN LEASE PMT", -LEASE_AMOUNT))
+
+    rows.append(Row(PROPERTY_TAX_DATE, "COUNTY TREASURER PROPERTY TAX PMT", -PROPERTY_TAX_AMOUNT))
 
     # Wholesale receivables (P1 lives here).
     number = FIRST_INVOICE_NUMBER
