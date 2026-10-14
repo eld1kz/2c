@@ -24,6 +24,7 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 ## Git
 - Claude handles commits. Commit after each verified milestone (tests green), not after every file.
 - Message format: `phase N: <short summary>`, e.g. `phase 1: csv ingestion + categorization`.
+- No `Co-Authored-By` or other attribution lines in commit messages or PR descriptions (disabled in `.claude/settings.json`).
 - Never commit `.env`, `.venv`, `node_modules` or secrets. Check `git status` before each commit.
 - Never push unless asked.
 
