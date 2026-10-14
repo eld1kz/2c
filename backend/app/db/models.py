@@ -411,11 +411,16 @@ def _guard_audit_bulk_append_only(state: ORMExecuteState) -> None:
         raise AppendOnlyViolation("AuditEvent is append-only")
 
 
+DEFAULT_MAX_DAILY_PAYMENTS = 1_000_000  # $10,000
+
+
 class Policy(Base):
     __tablename__ = "policies"
 
     business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), primary_key=True)
     max_single_payment: Mapped[int] = _money()
+    # Total of executed + approved payments with the same payment date (default 2 × the single limit).
+    max_daily_payments: Mapped[int] = mapped_column(BigInteger, nullable=False, default=DEFAULT_MAX_DAILY_PAYMENTS)
     currency: Mapped[str] = _currency()
     reminder_cooldown_days: Mapped[int] = mapped_column(Integer)
     require_owner_for: Mapped[list[str]] = mapped_column(JSON, default=list)

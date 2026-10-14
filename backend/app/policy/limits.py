@@ -6,6 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    Action,
+    ActionStatus,
     Invoice,
     InvoiceDirection,
     InvoiceStatus,
@@ -33,6 +35,21 @@ def invoice_outstanding(session: Session, invoice: Invoice) -> int:
             SandboxPayment.status.in_((PaymentStatus.scheduled, PaymentStatus.executed)),
         ))
     return max(invoice.total - int(banked) - int(sandboxed), 0)  # Postgres SUM() returns Decimal
+
+
+def payments_on(session: Session, business_id: int, day: date, exclude_action_id: int | None = None) -> int:
+    """Executed sandbox payments + approved, not yet executed schedule_payment Actions dated `day`."""
+    executed = session.scalar(
+        select(func.coalesce(func.sum(SandboxPayment.amount), 0)).where(
+            SandboxPayment.business_id == business_id,
+            SandboxPayment.scheduled_date == day,
+            SandboxPayment.status.in_((PaymentStatus.scheduled, PaymentStatus.executed)),
+        ))
+    approved = session.scalars(select(Action).where(
+        Action.business_id == business_id, Action.tool == "schedule_payment", Action.status == ActionStatus.approved))
+    pending = sum(a.params["amount"] for a in approved
+                  if a.id != exclude_action_id and a.params.get("date") == day.isoformat())
+    return int(executed) + pending
 
 
 def loan_limit(session: Session, business_id: int, option_id: str, today: date) -> int:

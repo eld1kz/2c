@@ -26,7 +26,7 @@ from app.db.models import (
     SandboxEmail,
     Tier,
 )
-from app.policy.limits import LOAN_PRODUCTS, OPEN_STATUSES, invoice_outstanding, loan_limit
+from app.policy.limits import LOAN_PRODUCTS, OPEN_STATUSES, invoice_outstanding, loan_limit, payments_on
 from app.policy.tiers import (
     EXECUTE_PARAMS,
     SchedulePaymentParams,
@@ -70,6 +70,7 @@ class ActionRequest:
     business_id: int
     tool: str
     params: dict[str, Any]
+    action_id: int | None = None  # set on the execution re-check, so the action does not count against itself
 
 
 @dataclass(frozen=True)
@@ -104,7 +105,7 @@ def check(action: ActionRequest, actor: Actor, ctx: GateContext) -> GateResult:
         return deny(f"invalid parameters ({problems})")
     match params:
         case SchedulePaymentParams():
-            return _schedule_payment(action.business_id, params, ctx)
+            return _schedule_payment(action.business_id, params, ctx, action.action_id)
         case SendReminderParams():
             return _send_reminder(action.business_id, params, ctx)
         case SubmitLoanApplicationParams():
@@ -112,7 +113,8 @@ def check(action: ActionRequest, actor: Actor, ctx: GateContext) -> GateResult:
     return deny(f"no gate rule for {action.tool}")  # pragma: no cover
 
 
-def _schedule_payment(business_id: int, p: SchedulePaymentParams, ctx: GateContext) -> GateResult:
+def _schedule_payment(business_id: int, p: SchedulePaymentParams, ctx: GateContext,
+                      action_id: int | None) -> GateResult:
     payee = ctx.session.get(Counterparty, p.payee_counterparty_id)
     if payee is None or payee.business_id != business_id:
         return deny("payee is not an existing counterparty")
@@ -131,6 +133,10 @@ def _schedule_payment(business_id: int, p: SchedulePaymentParams, ctx: GateConte
         return deny(f"amount {p.amount} exceeds the invoice's outstanding balance {outstanding} (cents)")
     if not ctx.today <= p.date <= ctx.today + timedelta(days=MAX_PAYMENT_LEAD_DAYS):
         return deny(f"payment date must be between {ctx.today} and {MAX_PAYMENT_LEAD_DAYS} days later")
+    day_total = payments_on(ctx.session, business_id, p.date, exclude_action_id=action_id) + p.amount
+    if day_total > ctx.policy.max_daily_payments:
+        return deny(f"payments dated {p.date} would total {day_total}, over max_daily_payments "
+                    f"{ctx.policy.max_daily_payments} (cents)")
     return APPROVAL
 
 

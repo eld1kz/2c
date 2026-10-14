@@ -40,6 +40,7 @@ DEMO_USERS = [
 ]
 DEFAULT_POLICY = {
     "max_single_payment": 500_000,
+    "max_daily_payments": 1_000_000,
     "currency": "USD",
     "reminder_cooldown_days": 7,
     "require_owner_for": ["schedule_payment", "submit_loan_application"],

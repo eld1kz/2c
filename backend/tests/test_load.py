@@ -26,6 +26,7 @@ def test_load_into_sqlite(tmp_path: Path) -> None:
 
         policy = s.get(Policy, business.id)
         assert policy.max_single_payment == 500_000
+        assert policy.max_daily_payments == 1_000_000
         assert policy.reminder_cooldown_days == 7
 
         inv = s.scalar(select(Invoice).where(Invoice.number == "INV-1042"))

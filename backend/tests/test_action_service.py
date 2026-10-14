@@ -1,5 +1,7 @@
 """ActionService: propose → gate → approve → sandbox → audit (SPEC §8, A1–A4)."""
 
+from datetime import date
+
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -7,8 +9,11 @@ from sqlalchemy.exc import IntegrityError
 from app.audit.verify import verify_chain
 from app.db.models import (
     Action,
+    ActionStatus,
     AuditEvent,
+    Invoice,
     PaymentStatus,
+    Policy,
     SandboxEmail,
     SandboxLoanApplication,
     SandboxPayment,
@@ -180,3 +185,54 @@ def test_every_decision_is_audited_and_chain_verifies(demo: Demo) -> None:
     assert _events(demo) == ["action_proposed", "action_approved", "action_executed", "action_proposed",
                              "action_rejected", "action_denied", "action_proposed", "approval_forbidden"]
     assert verify_chain(demo.session).ok
+
+
+# --- cumulative daily cap (Policy.max_daily_payments, default $10,000 per payment date) ---------
+
+def _verde_payables(demo: Demo, n: int, total: int = 400_000) -> list[Invoice]:
+    verde = demo.counterparties["Verde Green Coffee Imports"]
+    invoices = [Invoice(business_id=demo.business.id, direction="payable", counterparty_id=verde.id,
+                        number=f"VGC-CAP-{i}", issue_date=date(2026, 9, 28), due_date=date(2026, 10, 12),
+                        total=total, currency="USD", status="open") for i in range(n)]
+    demo.session.add_all(invoices)
+    demo.session.flush()
+    return invoices
+
+
+def _pay(demo: Demo, invoice: Invoice, key: str, day: str = "2026-10-12", amount: int = 400_000) -> Action:
+    return demo.service.propose(demo.actor("owner"), "schedule_payment", {
+        "payee_counterparty_id": invoice.counterparty_id, "invoice_id": invoice.id, "amount": amount, "date": day,
+    }, idempotency_key=key)
+
+
+def test_daily_cap_two_4000_payments_pass_third_denied(demo: Demo) -> None:
+    assert demo.session.get(Policy, demo.business.id).max_daily_payments == 1_000_000
+    first, second, third, fourth = _verde_payables(demo, 4)
+    for inv, key in ((first, "cap-1"), (second, "cap-2")):
+        assert demo.service.approve(demo.users["owner"], _pay(demo, inv, key).id).status == "executed"
+    denied = _pay(demo, third, "cap-3")
+    assert denied.status == "denied"
+    assert denied.result["denied"] == ("payments dated 2026-10-12 would total 1200000, over max_daily_payments "
+                                       "1000000 (cents)")
+    event = demo.session.scalar(select(AuditEvent).order_by(AuditEvent.seq.desc()))
+    assert (event.event_type, event.payload["action_id"]) == ("action_denied", denied.id)
+    assert _pay(demo, third, "cap-3-fits", amount=200_000).status == "proposed"  # exactly $10,000 is allowed
+    assert _pay(demo, fourth, "cap-4-next-day", day="2026-10-13").status == "proposed"
+    assert _count(demo, SandboxPayment) == 2
+
+
+def test_daily_cap_rechecked_at_execution(demo: Demo) -> None:
+    actions = [_pay(demo, inv, f"cap-x{i}") for i, inv in enumerate(_verde_payables(demo, 3))]
+    assert [a.status for a in actions] == ["proposed"] * 3  # proposals alone do not use up the cap
+    results = [demo.service.approve(demo.users["owner"], a.id) for a in actions]
+    assert [r.status for r in results] == ["executed", "executed", "denied"]
+    assert results[2].result["stage"] == "execute" and "max_daily_payments" in results[2].result["denied"]
+    assert _count(demo, SandboxPayment) == 2
+
+
+def test_daily_cap_counts_approved_but_not_yet_executed(demo: Demo) -> None:
+    pending_inv, executed_inv, new_inv = _verde_payables(demo, 3)
+    pending = _pay(demo, pending_inv, "cap-pending")
+    pending.status = ActionStatus.approved  # e.g. another request is mid-execution
+    demo.service.approve(demo.users["owner"], _pay(demo, executed_inv, "cap-executed").id)
+    assert _pay(demo, new_inv, "cap-new").status == "denied"

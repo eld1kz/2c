@@ -191,7 +191,7 @@ class ActionService:
         if action.status != ActionStatus.approved:
             self._audit(actor.label, "execute_invalid_state", action)
             raise InvalidState(f"action is {action.status.value}, not approved")
-        recheck = gate.check(ActionRequest(action.business_id, action.tool, action.params), actor,
+        recheck = gate.check(ActionRequest(action.business_id, action.tool, action.params, action.id), actor,
                              self._ctx(action.business_id))
         if recheck.decision == Decision.DENY:
             action.status, action.result = ActionStatus.denied, {"denied": recheck.reason, "stage": "execute"}
