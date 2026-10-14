@@ -36,6 +36,7 @@ from app.policy.tiers import (
 )
 
 DRAFT_TOOL = "draft_reminder"
+MAX_PAYMENT_LEAD_DAYS = 90  # payment date must be within [DEMO_TODAY, +90 days]
 
 
 class Decision(StrEnum):
@@ -128,6 +129,8 @@ def _schedule_payment(business_id: int, p: SchedulePaymentParams, ctx: GateConte
     outstanding = invoice_outstanding(ctx.session, invoice)
     if p.amount > outstanding:
         return deny(f"amount {p.amount} exceeds the invoice's outstanding balance {outstanding} (cents)")
+    if not ctx.today <= p.date <= ctx.today + timedelta(days=MAX_PAYMENT_LEAD_DAYS):
+        return deny(f"payment date must be between {ctx.today} and {MAX_PAYMENT_LEAD_DAYS} days later")
     return APPROVAL
 
 
@@ -140,6 +143,12 @@ def _send_reminder(business_id: int, p: SendReminderParams, ctx: GateContext) ->
     if (draft is None or draft.business_id != business_id or draft.tool != DRAFT_TOOL
             or draft.status != ActionStatus.executed or draft.params.get("invoice_id") != invoice.id):
         return deny("draft is not a reminder draft for this invoice")
+    # The draft states an amount and a lateness: refuse to send it once either may be out of date.
+    if draft.result.get("outstanding") != invoice_outstanding(ctx.session, invoice):
+        return deny("draft amount no longer matches the outstanding balance; draft a new reminder")
+    drafted_at = datetime.fromisoformat(draft.result["drafted_at"])
+    if ctx.now - drafted_at > timedelta(days=ctx.policy.reminder_cooldown_days):
+        return deny(f"draft is older than {ctx.policy.reminder_cooldown_days} days; draft a new reminder")
     customer = ctx.session.get(Counterparty, invoice.counterparty_id)
     if not customer.contact_email:
         return deny("customer has no stored contact email")

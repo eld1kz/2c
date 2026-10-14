@@ -14,6 +14,7 @@ from app.db.models import User
 
 ALGORITHM = "HS256"
 TOKEN_TTL = timedelta(hours=8)
+BCRYPT_MAX_BYTES = 72  # bcrypt rejects longer secrets; such a password can never match
 
 
 class InvalidToken(Exception):
@@ -43,5 +44,6 @@ def _dummy_hash() -> bytes:
 def verify_password(user: User | None, password: str) -> bool:
     """Constant-ish time: unknown emails still pay for a bcrypt check (no user enumeration by timing)."""
     hashed = user.password_hash.encode() if user else _dummy_hash()
-    ok = bcrypt.checkpw(password.encode(), hashed)
+    secret = password.encode("utf-8")
+    ok = bcrypt.checkpw(secret[:BCRYPT_MAX_BYTES], hashed) and len(secret) <= BCRYPT_MAX_BYTES
     return ok and user is not None

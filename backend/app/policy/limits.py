@@ -5,7 +5,16 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Invoice, InvoiceDirection, InvoiceStatus, PaymentStatus, SandboxPayment, Transaction
+from app.db.models import (
+    Invoice,
+    InvoiceDirection,
+    InvoiceStatus,
+    LoanStatus,
+    PaymentStatus,
+    SandboxLoanApplication,
+    SandboxPayment,
+    Transaction,
+)
 from app.engine.financing import FACTORING_ADVANCE_PCT, LOAN_MAX, OVERDRAFT_LIMIT
 
 OPEN_STATUSES = (InvoiceStatus.open, InvoiceStatus.overdue)
@@ -27,7 +36,18 @@ def invoice_outstanding(session: Session, invoice: Invoice) -> int:
 
 
 def loan_limit(session: Session, business_id: int, option_id: str, today: date) -> int:
-    """Largest amount a sandbox loan product will accept; factoring is bounded by eligible AR."""
+    """Amount still available from a sandbox loan product: its limit minus applications already
+    submitted or approved for it (factoring's limit is 85% of eligible receivables)."""
+    used = session.scalar(
+        select(func.coalesce(func.sum(SandboxLoanApplication.amount), 0)).where(
+            SandboxLoanApplication.business_id == business_id,
+            SandboxLoanApplication.option_id == option_id,
+            SandboxLoanApplication.status.in_((LoanStatus.submitted, LoanStatus.approved)),
+        ))
+    return max(_product_limit(session, business_id, option_id, today) - int(used), 0)
+
+
+def _product_limit(session: Session, business_id: int, option_id: str, today: date) -> int:
     if option_id in FIXED_LOAN_LIMITS:
         return FIXED_LOAN_LIMITS[option_id]
     receivables = session.scalars(select(Invoice).where(

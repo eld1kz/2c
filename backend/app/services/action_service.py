@@ -3,7 +3,8 @@
 propose → policy gate → Action `proposed` (needs approval) or `denied`.
 approve → RBAC → `approved` → gate re-check → sandbox write → `executed` (or `denied`/`failed`).
 Every proposal, decision, refusal, execution and replay writes an AuditEvent. Executing an action
-that already ran returns its original result and writes nothing to the sandbox.
+that already ran returns its original result and writes nothing to the sandbox. Decisions lock and
+re-read the Action row first, so two concurrent approvals cannot both act on a stale `proposed`.
 """
 
 import uuid
@@ -88,25 +89,39 @@ class ActionService:
                         "status": action.status.value}
         audit.append(self.session, actor, event_type, payload, now=self.clock())
 
-    def _get(self, user: User, action_id: int) -> Action:
-        action = self.session.get(Action, action_id)
+    def _locked(self, user: User, action_id: int) -> Action:
+        """Row-locked, freshly read Action of the user's business (SELECT … FOR UPDATE on Postgres)."""
+        action = self.session.scalar(
+            select(Action).where(Action.id == action_id).with_for_update()
+            .execution_options(populate_existing=True))
         if action is None or action.business_id != user.business_id:
+            self._audit(actor_for(user).label, "action_not_found", None, business_id=user.business_id,
+                        requested_action_id=action_id)
             raise NotFound(f"action {action_id} not found")
         return action
+
+    def _reject_input(self, actor: Actor, reason: str) -> None:
+        self._audit(actor.label, "action_input_rejected", None, business_id=actor.business_id, reason=reason)
+        raise ActionError(reason)
 
     # --- propose -----------------------------------------------------------------------------
 
     def propose(self, actor: Actor, tool: str, params: dict[str, Any], *, idempotency_key: str,
                 rationale: str = "", evidence_ids: tuple[str, ...] = ()) -> Action:
-        existing = self.session.scalar(select(Action).where(Action.idempotency_key == idempotency_key))
+        problem = audit.json_problem([tool, params, rationale, list(evidence_ids), idempotency_key])
+        if problem is not None:
+            self._reject_input(actor, f"invalid input: {problem}")  # checked before anything is written
+        tier = tier_of(tool)
+        if tier in (Tier.READ, Tier.SUGGEST):
+            self._reject_input(actor, f"{tool} is a {tier.value} tool, not an action to approve")
+        existing = self.session.scalar(select(Action).where(Action.business_id == actor.business_id,
+                                                            Action.idempotency_key == idempotency_key))
         if existing is not None:
-            if existing.business_id != actor.business_id or existing.tool != tool:
+            if existing.tool != tool or existing.params != params:
+                self._audit(actor.label, "idempotency_conflict", existing)
                 raise InvalidState("idempotency key already used for a different action")
             self._audit(actor.label, "action_propose_replayed", existing)
             return existing
-        tier = tier_of(tool)
-        if tier in (Tier.READ, Tier.SUGGEST):
-            raise ActionError(f"{tool} is a {tier.value} tool, not an action to approve")
 
         result = gate.check(ActionRequest(actor.business_id, tool, params), actor, self._ctx(actor.business_id))
         denied = result.decision == Decision.DENY
@@ -125,13 +140,14 @@ class ActionService:
         self.session.add(action)
         self.session.flush()
         self._audit(actor.label, "action_denied" if denied else "action_proposed", action,
-                    params=params, decision=result.decision.value, reason=result.reason)
+                    params=params, rationale=rationale, evidence_ids=list(evidence_ids),
+                    decision=result.decision.value, reason=result.reason)
         return action
 
     # --- decide ------------------------------------------------------------------------------
 
     def approve(self, user: User, action_id: int) -> Action:
-        action = self._get(user, action_id)
+        action = self._locked(user, action_id)
         actor = actor_for(user)
         if not can_approve(user.role, action.tool, self.session.get(Policy, user.business_id)):
             self._audit(actor.label, "approval_forbidden", action, role=user.role.value)
@@ -147,7 +163,7 @@ class ActionService:
         return self._execute(actor, action)
 
     def reject(self, user: User, action_id: int) -> Action:
-        action = self._get(user, action_id)
+        action = self._locked(user, action_id)
         actor = actor_for(user)
         if not can_approve(user.role, action.tool, self.session.get(Policy, user.business_id)):
             self._audit(actor.label, "rejection_forbidden", action, role=user.role.value)
@@ -161,7 +177,7 @@ class ActionService:
 
     def execute(self, user: User, action_id: int) -> Action:
         """Run an approved action; an already-executed one returns its original result (A4)."""
-        action = self._get(user, action_id)
+        action = self._locked(user, action_id)
         actor = actor_for(user)
         if not can_approve(user.role, action.tool, self.session.get(Policy, user.business_id)):
             self._audit(actor.label, "execute_forbidden", action, role=user.role.value)
@@ -228,10 +244,13 @@ class ActionService:
         invoice = self.session.get(Invoice, invoice_id)
         if (invoice is None or invoice.business_id != actor.business_id
                 or invoice.direction != InvoiceDirection.receivable or invoice.status not in OPEN_STATUSES):
+            self._audit(actor.label, "draft_denied", None, business_id=actor.business_id,
+                        reason=f"open receivable {invoice_id} not found")
             raise NotFound(f"open receivable {invoice_id} not found")
+        outstanding = invoice_outstanding(self.session, invoice)
         draft = reminder_draft(self.session.get(Business, actor.business_id),
                                self.session.get(Counterparty, invoice.counterparty_id), invoice,
-                               invoice_outstanding(self.session, invoice), Tone(tone), self.today)
+                               outstanding, Tone(tone), self.today)
         action = Action(
             business_id=actor.business_id,
             proposed_by=ProposedBy.agent if actor.via_agent else ProposedBy.user,
@@ -240,7 +259,8 @@ class ActionService:
             tier=Tier.SUGGEST,
             status=ActionStatus.executed,
             idempotency_key=f"draft:{uuid.uuid4().hex}",
-            result={"subject": draft.subject, "body": draft.body},
+            result={"subject": draft.subject, "body": draft.body, "outstanding": outstanding,
+                    "drafted_at": self.clock().isoformat()},
         )
         self.session.add(action)
         self.session.flush()

@@ -141,4 +141,6 @@ def test_cooldown_window(demo: Demo) -> None:
     demo.clock.advance(days=6, hours=23)
     assert _check(demo, "send_reminder", params)[0] == Decision.DENY
     demo.clock.advance(hours=2)
-    assert _check(demo, "send_reminder", params)[0] == Decision.REQUIRE_APPROVAL
+    assert _check(demo, "send_reminder", params) == (Decision.DENY, "draft is older than 7 days; draft a new reminder")
+    fresh = svc.record_draft(demo.actor("owner"), inv.id, "firm")
+    assert _check(demo, "send_reminder", {"invoice_id": inv.id, "draft_id": fresh.id})[0] == Decision.REQUIRE_APPROVAL

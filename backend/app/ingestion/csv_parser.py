@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 MAX_BYTES = 2 * 1024 * 1024
 MAX_ROWS = 20_000
+MAX_ABS_CENTS = 10**12  # $10bn per row: far above any SME row, far below BIGINT overflow
 DATE_FORMATS = ["%Y-%m-%d", "%m/%d/%Y"]  # DD/MM is ambiguous for a USD bank, so not accepted
 
 HEADER_ALIASES = {
@@ -51,6 +52,8 @@ def parse_cents(text: str) -> int:
     if not m:
         raise CsvError(f"not a money amount: {text!r}")
     cents = int(m.group(1)) * 100 + int((m.group(2) or "").ljust(2, "0"))
+    if cents > MAX_ABS_CENTS:
+        raise CsvError(f"amount out of range: {text!r}")
     return -cents if negative else cents
 
 

@@ -83,7 +83,7 @@ def test_login_and_failed_login_audited(client: TestClient, db: sessionmaker) ->
     assert _events(db) == ["login_succeeded", "login_failed", "login_failed"]
     with db() as s:
         payload = s.scalar(select(AuditEvent.payload).where(AuditEvent.event_type == "login_failed"))
-    assert "email" not in payload and len(payload["email_sha256"]) == 64
+    assert set(payload) == {"email_key"} and len(payload["email_key"]) == 64  # keyed HMAC, no email
 
 
 def test_token_required_and_validated(client: TestClient) -> None:

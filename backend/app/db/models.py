@@ -362,6 +362,7 @@ class Insight(Base):
 
 class Action(Base):
     __tablename__ = "actions"
+    __table_args__ = (UniqueConstraint("business_id", "idempotency_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"))
@@ -372,7 +373,7 @@ class Action(Base):
     status: Mapped[ActionStatus] = mapped_column(_enum(ActionStatus))
     rationale: Mapped[str] = mapped_column(Text, default="")
     evidence_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
-    idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
+    idempotency_key: Mapped[str] = mapped_column(String(100))  # unique per business
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     decided_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)

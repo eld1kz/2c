@@ -7,6 +7,7 @@ the chain; the `seq` unique constraint is the backstop. There is no update or de
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -20,7 +21,27 @@ _APPEND_LOCK_KEY = 0x4C57_4155  # arbitrary constant for pg_advisory_xact_lock
 
 
 def canonical_json(data: Any) -> str:
-    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    """ASCII-only (byte-identical everywhere, lone surrogates escaped) and strict JSON (no NaN/Infinity)."""
+    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+
+
+def json_problem(value: Any) -> str | None:
+    """Why `value` cannot be stored and hashed as JSON, or None. Check untrusted input with it first."""
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            return "text is not valid Unicode"
+        return None
+    if isinstance(value, bool) or value is None or isinstance(value, int):
+        return None
+    if isinstance(value, float):
+        return None if math.isfinite(value) else "number is not finite"
+    if isinstance(value, dict):
+        return next((p for k, v in value.items() for p in (json_problem(k), json_problem(v)) if p), None)
+    if isinstance(value, (list, tuple)):
+        return next((p for v in value if (p := json_problem(v))), None)
+    return f"unsupported value type {type(value).__name__}"
 
 
 def canonical_ts(ts: datetime) -> str:

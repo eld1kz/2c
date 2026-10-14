@@ -3,12 +3,21 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.audit.log import json_problem
 
 
 class LoginIn(BaseModel):
     email: str = Field(max_length=254)
     password: str = Field(max_length=200)
+
+    @field_validator("email", "password")
+    @classmethod
+    def _unicode(cls, value: str) -> str:
+        if json_problem(value):
+            raise ValueError("text is not valid Unicode")
+        return value
 
 
 class TokenOut(BaseModel):
@@ -26,6 +35,13 @@ class ActionIn(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=100)
     rationale: str = Field(default="", max_length=2000)
     evidence_ids: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def _storable(self) -> "ActionIn":
+        problem = json_problem([self.tool, self.params, self.idempotency_key, self.rationale, self.evidence_ids])
+        if problem:
+            raise ValueError(problem)  # NaN/Infinity, lone surrogates: never stored or hashed
+        return self
 
 
 class ActionOut(BaseModel):
