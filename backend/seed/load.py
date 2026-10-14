@@ -28,11 +28,7 @@ from app.db.models import (
     User,
 )
 from app.engine.categorize import DEFAULT_KEYWORD_RULES, Classifier, NullClassifier
-from app.engine.counterparty_stats import refresh_counterparty_stats
-from app.engine.forecast import project, save_forecast
-from app.engine.insights.registry import refresh_insights
-from app.engine.recurring import detect_recurring
-from app.engine.snapshot import load_snapshot
+from app.engine.refresh import refresh_engine
 from app.ingestion.pipeline import ingest_csv
 from seed.generate_golden import GOLDEN_DIR, Q2_FILE, Q3_FILE
 
@@ -113,13 +109,7 @@ def load(session: Session, golden_dir: Path = GOLDEN_DIR, classifier: Classifier
     checking = accounts[0]
     for name in (Q2_FILE, Q3_FILE):
         ingest_csv(session, checking, name, (golden_dir / name).read_bytes(), classifier or NullClassifier())
-    today = get_settings().demo_today
-    detect_recurring(session, business.id, today)
-    refresh_counterparty_stats(session, business.id)
-    snapshot = load_snapshot(session, business.id, today)
-    forecast = project(snapshot)
-    save_forecast(session, business.id, forecast)
-    refresh_insights(session, snapshot, forecast)
+    refresh_engine(session, business.id, get_settings().demo_today)
     return business
 
 

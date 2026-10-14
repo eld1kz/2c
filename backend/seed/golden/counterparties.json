@@ -1,95 +1,111 @@
 [
   {
+    "contact_email": "ap@harborlane.example",
     "is_allowed_payee": false,
     "kind": "customer",
     "name": "Harbor Lane Café",
     "normalized_name": "HARBOR LANE CAFE"
   },
   {
+    "contact_email": "accounts@copperleaf.example",
     "is_allowed_payee": false,
     "kind": "customer",
     "name": "Copperleaf Bakery",
     "normalized_name": "COPPERLEAF BAKERY"
   },
   {
+    "contact_email": "office@juniperstreet.example",
     "is_allowed_payee": false,
     "kind": "customer",
     "name": "Juniper Street Diner",
     "normalized_name": "JUNIPER STREET DINER"
   },
   {
+    "contact_email": "billing@tidewatercowork.example",
     "is_allowed_payee": false,
     "kind": "customer",
     "name": "Tidewater Co-work",
     "normalized_name": "TIDEWATER COWORK"
   },
   {
+    "contact_email": "hello@littlefern.example",
     "is_allowed_payee": false,
     "kind": "customer",
     "name": "Little Fern Bookshop Café",
     "normalized_name": "LITTLE FERN BOOKSHOP"
   },
   {
+    "contact_email": "ar@verdegreen.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Verde Green Coffee Imports",
     "normalized_name": "VERDE GREEN COFFEE IMPORTS"
   },
   {
+    "contact_email": "billing@quickship.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "QuickShip Logistics",
     "normalized_name": "QUICKSHIP LOGISTICS"
   },
   {
+    "contact_email": "orders@northfold.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Northfold Packaging",
     "normalized_name": "NORTHFOLD PACKAGING"
   },
   {
+    "contact_email": "servicing@crestline.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Crestline Equipment Finance",
     "normalized_name": "CRESTLINE EQUIPMENT FINANCE"
   },
   {
+    "contact_email": "leasing@maplewood.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Maplewood Property Group",
     "normalized_name": "MAPLEWOOD PROPERTY GROUP"
   },
   {
+    "contact_email": "support@paystream.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Paystream Payroll",
     "normalized_name": "PAYSTREAM PAYROLL"
   },
   {
+    "contact_email": "billing@riverbend.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Riverbend Utilities",
     "normalized_name": "RIVERBEND UTILITIES"
   },
   {
+    "contact_email": "billing@quillbook.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Quillbook Accounting",
     "normalized_name": "QUILLBOOK ACCOUNTING"
   },
   {
+    "contact_email": "billing@designly.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Designly Pro",
     "normalized_name": "DESIGNLY PRO"
   },
   {
+    "contact_email": "billing@designly.example",
     "is_allowed_payee": true,
     "kind": "supplier",
     "name": "Designly Team",
     "normalized_name": "DESIGNLY TEAM"
   },
   {
+    "contact_email": "support@cloudpos.example",
     "is_allowed_payee": false,
     "kind": "both",
     "name": "CloudPOS",

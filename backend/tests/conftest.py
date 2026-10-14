@@ -1,16 +1,21 @@
 import os
 import socket
 from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 # Test-only signing key so app.main passes its startup JWT_SECRET check.
 os.environ["JWT_SECRET"] = "test-only-jwt-secret-0123456789abcdef"
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Base, Business
+from app.config import DEFAULT_DEMO_TODAY
+from app.db.models import Base, Business, Counterparty, Invoice, User
 from app.engine.categorize import NullClassifier
+from app.policy.gate import Actor
+from app.services.action_service import ActionService, actor_for
 from seed.load import load
 from tests.fakes import FakeClassifier
 
@@ -45,3 +50,46 @@ def golden_path(request: pytest.FixtureRequest) -> Iterator[tuple[str, Session, 
     classifier = NullClassifier() if request.param == "null" else FakeClassifier()
     with Session(engine) as session:
         yield request.param, session, load(session, classifier=classifier)
+
+
+class FakeClock:
+    """Injectable wall clock for ActionService (cooldowns, audit timestamps)."""
+
+    def __init__(self, now: datetime) -> None:
+        self.now = now
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, **delta: float) -> None:
+        self.now += timedelta(**delta)
+
+
+@dataclass
+class Demo:
+    session: Session
+    business: Business
+    service: ActionService
+    clock: FakeClock
+    users: dict[str, User]
+    invoices: dict[str, Invoice]
+    counterparties: dict[str, Counterparty]
+
+    def actor(self, role: str) -> Actor:
+        return actor_for(self.users[role])
+
+
+@pytest.fixture
+def demo(golden_db: tuple[Session, Business, FakeClassifier]) -> Demo:
+    """Golden data + ActionService with a fake clock and lookups by role / invoice number / name."""
+    session, business, _ = golden_db
+    clock = FakeClock(datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc))
+    return Demo(
+        session=session,
+        business=business,
+        service=ActionService(session, DEFAULT_DEMO_TODAY, clock),
+        clock=clock,
+        users={u.role.value: u for u in session.scalars(select(User))},
+        invoices={i.number: i for i in session.scalars(select(Invoice))},
+        counterparties={c.name: c for c in session.scalars(select(Counterparty))},
+    )

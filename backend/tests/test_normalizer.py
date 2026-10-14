@@ -9,7 +9,7 @@ from app.ingestion.normalizer import extract_invoice_refs, invoice_key, match_co
 from seed.generate_golden import COUNTERPARTIES
 from tests.fakes import FakeClassifier
 
-CPS = {i: nn for i, (_, nn, _, _) in enumerate(COUNTERPARTIES, start=1)}
+CPS = {i: nn for i, (_, nn, *_) in enumerate(COUNTERPARTIES, start=1)}
 BY_NAME = {nn: i for i, nn in CPS.items()}
 
 

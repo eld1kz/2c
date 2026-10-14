@@ -1,7 +1,8 @@
 """SQLAlchemy models for SPEC §5.
 
 Money is always integer minor units (BigInteger) next to an ISO 4217 `currency` column.
-AuditEvent is append-only: the ORM refuses to flush updates or deletes of it.
+AuditEvent is append-only: the ORM refuses to flush updates or deletes of it, and migration 0003
+adds a DB trigger that rejects UPDATE/DELETE from any client.
 """
 
 import datetime as dt
@@ -236,6 +237,8 @@ class Counterparty(Base):
     normalized_name: Mapped[str] = mapped_column(String(200), index=True)
     kind: Mapped[CounterpartyKind] = mapped_column(_enum(CounterpartyKind))
     is_allowed_payee: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Stored contact for sandbox emails; recipients never come from documents or drafts.
+    contact_email: Mapped[str | None] = mapped_column(String(254))
     # avg_days_late, invoices_count, on_time_rate — computed by the engine
     stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
@@ -428,6 +431,7 @@ class SandboxPayment(Base):
     business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"))
     action_id: Mapped[int] = mapped_column(ForeignKey("actions.id"), unique=True)
     payee_counterparty_id: Mapped[int] = mapped_column(ForeignKey("counterparties.id"))
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"))  # the payable it settles
     amount: Mapped[int] = _money()
     currency: Mapped[str] = _currency()
     scheduled_date: Mapped[dt.date] = mapped_column(Date)
