@@ -172,7 +172,7 @@ Sandbox catalog: overdraft (APR), invoice factoring (advance %, fee per 30d), sh
 | Tier | Tool | Notes |
 |---|---|---|
 | READ | `get_cash_position`, `get_ledger(filters)`, `get_forecast`, `get_insights`, `explain_record(id)` | auto |
-| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_cfo_memo()` | auto; outputs are drafts |
+| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_cfo_memo()` | auto; outputs are drafts (`draft_terms_request`: supplier payment-terms request, never sent by itself) |
 | EXECUTE | `send_reminder(invoice_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
 
 The agent has **no** approve tool. Approvals come only from an authenticated human via API.
