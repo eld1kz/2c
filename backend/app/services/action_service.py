@@ -7,6 +7,7 @@ that already ran returns its original result and writes nothing to the sandbox. 
 re-read the Action row first, so two concurrent approvals cannot both act on a stale `proposed`.
 """
 
+import statistics
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime, timezone
@@ -22,8 +23,10 @@ from app.db.models import (
     ActionStatus,
     Business,
     Counterparty,
+    CounterpartyKind,
     Invoice,
     InvoiceDirection,
+    InvoiceStatus,
     Policy,
     ProposedBy,
     Tier,
@@ -40,7 +43,10 @@ from app.policy.tiers import (
     tier_of,
 )
 from app.sandbox import bank, loans, outbox
-from app.services.drafts import Tone, reminder_draft
+from app.services.drafts import Tone, reminder_draft, terms_request_draft
+
+MIN_TERMS_EXTENSION_DAYS = 7
+MAX_TERMS_EXTENSION_DAYS = 60
 
 
 class ActionError(Exception):
@@ -235,12 +241,32 @@ class ActionService:
 
     # --- drafts (SUGGEST) --------------------------------------------------------------------
 
-    def record_draft(self, actor: Actor, invoice_id: int, tone: Tone) -> Action:
-        """draft_reminder: a templated reminder stored as an executed SUGGEST action."""
-        result = gate.check(ActionRequest(actor.business_id, "draft_reminder", {}), actor, self._ctx(actor.business_id))
+    def _check_draft(self, actor: Actor, tool: str) -> None:
+        result = gate.check(ActionRequest(actor.business_id, tool, {}), actor, self._ctx(actor.business_id))
         if result.decision == Decision.DENY:
             self._audit(actor.label, "draft_denied", None, business_id=actor.business_id, reason=result.reason)
             raise Forbidden(result.reason)
+
+    def _store_draft(self, actor: Actor, tool: str, params: dict[str, Any], result: dict[str, Any],
+                     **audit_extra: Any) -> Action:
+        action = Action(
+            business_id=actor.business_id,
+            proposed_by=ProposedBy.agent if actor.via_agent else ProposedBy.user,
+            tool=tool,
+            params=params,
+            tier=Tier.SUGGEST,
+            status=ActionStatus.executed,
+            idempotency_key=f"draft:{uuid.uuid4().hex}",
+            result={**result, "drafted_at": self.clock().isoformat()},
+        )
+        self.session.add(action)
+        self.session.flush()
+        self._audit(actor.label, "draft_created", action, **audit_extra)
+        return action
+
+    def record_draft(self, actor: Actor, invoice_id: int, tone: Tone) -> Action:
+        """draft_reminder: a templated reminder stored as an executed SUGGEST action."""
+        self._check_draft(actor, "draft_reminder")
         invoice = self.session.get(Invoice, invoice_id)
         if (invoice is None or invoice.business_id != actor.business_id
                 or invoice.direction != InvoiceDirection.receivable or invoice.status not in OPEN_STATUSES):
@@ -251,18 +277,31 @@ class ActionService:
         draft = reminder_draft(self.session.get(Business, actor.business_id),
                                self.session.get(Counterparty, invoice.counterparty_id), invoice,
                                outstanding, Tone(tone), self.today)
-        action = Action(
-            business_id=actor.business_id,
-            proposed_by=ProposedBy.agent if actor.via_agent else ProposedBy.user,
-            tool="draft_reminder",
-            params={"invoice_id": invoice.id, "tone": Tone(tone).value},
-            tier=Tier.SUGGEST,
-            status=ActionStatus.executed,
-            idempotency_key=f"draft:{uuid.uuid4().hex}",
-            result={"subject": draft.subject, "body": draft.body, "outstanding": outstanding,
-                    "drafted_at": self.clock().isoformat()},
-        )
-        self.session.add(action)
-        self.session.flush()
-        self._audit(actor.label, "draft_created", action, invoice_id=invoice.id)
-        return action
+        return self._store_draft(actor, "draft_reminder", {"invoice_id": invoice.id, "tone": Tone(tone).value},
+                                 {"subject": draft.subject, "body": draft.body, "outstanding": outstanding},
+                                 invoice_id=invoice.id)
+
+    def record_terms_draft(self, actor: Actor, counterparty_id: int, extension_days: int) -> Action:
+        """draft_terms_request: a templated supplier payment-terms request, stored as an executed
+        SUGGEST action. It is a draft only; no tool sends it."""
+        self._check_draft(actor, "draft_terms_request")
+        supplier = self.session.get(Counterparty, counterparty_id)
+        if (supplier is None or supplier.business_id != actor.business_id
+                or supplier.kind not in (CounterpartyKind.supplier, CounterpartyKind.both)):
+            self._audit(actor.label, "draft_denied", None, business_id=actor.business_id,
+                        reason=f"supplier {counterparty_id} not found")
+            raise NotFound(f"supplier {counterparty_id} not found")
+        if not MIN_TERMS_EXTENSION_DAYS <= extension_days <= MAX_TERMS_EXTENSION_DAYS:
+            self._reject_input(actor, f"extension_days must be between {MIN_TERMS_EXTENSION_DAYS} and "
+                                      f"{MAX_TERMS_EXTENSION_DAYS}")
+        terms = [(i.due_date - i.issue_date).days for i in self.session.scalars(select(Invoice).where(
+            Invoice.counterparty_id == supplier.id, Invoice.direction == InvoiceDirection.payable,
+            Invoice.status != InvoiceStatus.void))]
+        current = statistics.median_low(terms) if terms else None
+        draft = terms_request_draft(self.session.get(Business, actor.business_id), supplier, current,
+                                    extension_days, self.today)
+        return self._store_draft(
+            actor, "draft_terms_request", {"counterparty_id": supplier.id, "extension_days": extension_days},
+            {"subject": draft.subject, "body": draft.body, "current_terms_days": current,
+             "new_terms_days": None if current is None else current + extension_days},
+            counterparty_id=supplier.id)

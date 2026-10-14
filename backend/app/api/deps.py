@@ -1,12 +1,14 @@
-"""FastAPI dependencies: DB session, current user, action service, classifier."""
+"""FastAPI dependencies: DB session, current user, action service, classifier, chat model."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from functools import lru_cache
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.agent.runner import AnthropicChatModel, ChatModel
 from app.auth.jwt import InvalidToken, read_token
 from app.config import Settings, get_settings
 from app.db.models import User
@@ -54,6 +56,24 @@ def get_classifier(settings: Settings = Depends(get_settings)) -> Classifier:
     from app.engine.llm_classifier import classifier_from_settings
 
     return classifier_from_settings(settings)
+
+
+def get_session_factory() -> Callable[[], Session]:
+    """Sessions opened inside a streaming response, after request dependencies have closed."""
+    from app.db.session import SessionLocal
+
+    return SessionLocal
+
+
+@lru_cache
+def _anthropic_model(api_key: str, model: str) -> AnthropicChatModel:
+    return AnthropicChatModel.connect(api_key, model)
+
+
+def get_chat_model(settings: Settings = Depends(get_settings)) -> ChatModel:
+    if not settings.anthropic_api_key or not settings.llm_model:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "the assistant is not configured")
+    return _anthropic_model(settings.anthropic_api_key, settings.llm_model)
 
 
 @contextmanager

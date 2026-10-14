@@ -88,3 +88,18 @@ def test_receivable_moved_by_scenario_is_not_offered_again(golden_path: tuple[st
     options = {o.option_id: o for o in rank_financing(scenario.gap(), scenario, snap).options}
     assert options["accelerate_receivables"].max_amount == 0
     assert options["invoice_factoring"].max_amount == 0
+
+
+def test_supplier_terms_breakdown_by_supplier(golden_path: tuple[str, Session, Business]) -> None:
+    """P4: after collecting INV-1042, Verde's deferrable payables alone cover the leftover gap."""
+    path, session, business = golden_path
+    snap = load_snapshot(session, business.id, DEMO_TODAY)
+    inv_1042 = session.scalar(select(Invoice.id).where(Invoice.number == "INV-1042"))
+    scenario = run_what_if(golden_forecast(session, business), [CollectReceivable(inv_1042, DEMO_TODAY)]).scenario
+    (terms,) = [o for o in rank_financing(scenario.gap(), scenario, snap).options
+                if o.option_id == "supplier_terms_extension"]
+    names = {c.id: c.name for c in session.scalars(select(Counterparty))}
+    shares = [(names[s.counterparty_id], s.amount, s.covers_gap) for s in terms.by_counterparty]
+    assert shares == [("Verde Green Coffee Imports", 439_200, True), ("QuickShip Logistics", 46_500, False)]
+    assert sum(s.amount for s in terms.by_counterparty) == terms.max_amount
+    assert set().union(*(s.evidence_ids for s in terms.by_counterparty)) == set(terms.evidence_ids)

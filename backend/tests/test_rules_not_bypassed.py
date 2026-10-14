@@ -67,7 +67,7 @@ def test_engine_and_ingestion_never_touch_sandbox_tables() -> None:
                 assert not any(a.name.startswith("Sandbox") for a in node.names), name
 
 
-def test_only_llm_classifier_imports_anthropic() -> None:
+def test_only_the_llm_modules_import_anthropic() -> None:
     importers = {
         name
         for name, tree in _trees(".").items()
@@ -75,4 +75,4 @@ def test_only_llm_classifier_imports_anthropic() -> None:
         if (isinstance(node, ast.Import) and any(a.name == "anthropic" for a in node.names))
         or (isinstance(node, ast.ImportFrom) and node.module == "anthropic")
     }
-    assert importers == {"engine/llm_classifier.py"}
+    assert importers == {"engine/llm_classifier.py", "agent/runner.py"}

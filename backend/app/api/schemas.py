@@ -88,3 +88,17 @@ class UploadOut(BaseModel):
     by_rule: int
     by_llm: int
     needs_review: int
+
+
+class ChatIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4000)
+    conversation_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+    @field_validator("message")
+    @classmethod
+    def _unicode(cls, value: str) -> str:
+        if json_problem(value):
+            raise ValueError("text is not valid Unicode")
+        return value

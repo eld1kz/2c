@@ -1,3 +1,4 @@
+import json
 import os
 import socket
 from collections.abc import Iterator
@@ -8,16 +9,18 @@ from datetime import datetime, timedelta, timezone
 os.environ["JWT_SECRET"] = "test-only-jwt-secret-0123456789abcdef"
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.config import DEFAULT_DEMO_TODAY
-from app.db.models import Base, Business, Counterparty, Invoice, User
+from app.db.models import AuditEvent, Base, Business, Counterparty, Invoice, User
 from app.engine.categorize import NullClassifier
 from app.policy.gate import Actor
 from app.services.action_service import ActionService, actor_for
-from seed.load import load
-from tests.fakes import FakeClassifier
+from seed.load import DEMO_PASSWORD, load
+from tests.fakes import FakeClassifier, ScriptedModel
 
 
 @pytest.fixture(autouse=True)
@@ -93,3 +96,78 @@ def demo(golden_db: tuple[Session, Business, FakeClassifier]) -> Demo:
         invoices={i.number: i for i in session.scalars(select(Invoice))},
         counterparties={c.name: c for c in session.scalars(select(Counterparty))},
     )
+
+
+def parse_sse(body: str) -> list[tuple[str, dict]]:
+    events = []
+    for chunk in body.split("\n\n"):
+        if chunk.strip():
+            name_line, data_line = chunk.split("\n", 1)
+            events.append((name_line.removeprefix("event: "), json.loads(data_line.removeprefix("data: "))))
+    return events
+
+
+@dataclass
+class ChatHarness:
+    """The HTTP app over golden data in SQLite, with the chat model replaced by a ScriptedModel."""
+
+    client: TestClient
+    factory: sessionmaker
+    model: ScriptedModel
+
+    def login(self, role: str) -> dict[str, str]:
+        r = self.client.post("/auth/login", json={"email": f"{role}@emberoak.demo", "password": DEMO_PASSWORD})
+        assert r.status_code == 200, r.text
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    def chat(self, headers: dict[str, str], message: str, conversation_id: str | None = None,
+             expect: int = 200) -> list[tuple[str, dict]]:
+        body = {"message": message} | ({"conversation_id": conversation_id} if conversation_id else {})
+        r = self.client.post("/chat", headers=headers, json=body)
+        assert r.status_code == expect, r.text
+        return parse_sse(r.text) if expect == 200 else [("http_error", r.json())]
+
+    def invoice_id(self, number: str) -> int:
+        with self.factory() as s:
+            return s.scalar(select(Invoice.id).where(Invoice.number == number))
+
+    def counterparty_id(self, name: str) -> int:
+        with self.factory() as s:
+            return s.scalar(select(Counterparty.id).where(Counterparty.name == name))
+
+    def events(self) -> list[str]:
+        with self.factory() as s:
+            return list(s.scalars(select(AuditEvent.event_type).order_by(AuditEvent.seq)))
+
+
+@pytest.fixture
+def chat(monkeypatch: pytest.MonkeyPatch) -> Iterator[ChatHarness]:
+    from app.agent.runner import ConversationStore
+    from app.api import routes_chat
+    from app.api.deps import get_chat_model, get_classifier, get_session, get_session_factory
+    from app.main import app
+
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    with factory() as s:
+        load(s, classifier=FakeClassifier())
+        s.commit()
+
+    def session_override() -> Iterator[Session]:
+        with factory() as s:
+            try:
+                yield s
+                s.commit()
+            except Exception:
+                s.rollback()
+                raise
+
+    harness = ChatHarness(TestClient(app), factory, ScriptedModel())
+    monkeypatch.setattr(routes_chat, "conversations", ConversationStore())
+    app.dependency_overrides[get_session] = session_override
+    app.dependency_overrides[get_session_factory] = lambda: factory
+    app.dependency_overrides[get_chat_model] = lambda: harness.model
+    app.dependency_overrides[get_classifier] = FakeClassifier
+    yield harness
+    app.dependency_overrides.clear()

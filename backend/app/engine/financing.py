@@ -10,8 +10,11 @@ What each option can cover, from the forecast's own lines:
 - supplier terms extension: invoice-backed payables to suppliers with a good payment history,
   due between the gap start and the end of its lowest week, that +30 days pushes past that week.
 Receivables/payables already moved by a what-if scenario are not offered again.
+The supplier option also breaks its amount down by supplier, so it is clear whether one supplier
+alone would close the gap.
 """
 
+import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -38,6 +41,14 @@ GOOD_SUPPLIER_MIN_INVOICES = 3
 
 
 @dataclass(frozen=True)
+class SupplierShare:
+    counterparty_id: int
+    amount: int  # cents this supplier's deferrable payables provide
+    covers_gap: bool
+    evidence_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FinancingOption:
     option_id: str
     name: str
@@ -47,6 +58,7 @@ class FinancingOption:
     pros: tuple[str, ...]
     cons: tuple[str, ...]
     evidence_ids: tuple[str, ...]
+    by_counterparty: tuple[SupplierShare, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -85,10 +97,22 @@ def _deferrable_payables(gap: Gap, forecast: Forecast, snap: Snapshot, touched: 
     ]
 
 
+def _evidence(lines: Sequence[Line]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(s for ln in lines for s in ln.source_ids))
+
+
 def _option(option_id: str, name: str, cost: int, max_amount: int, gap: Gap, pros: tuple[str, ...],
             cons: tuple[str, ...], evidence: Sequence[Line] = ()) -> FinancingOption:
-    ids = tuple(dict.fromkeys(s for ln in evidence for s in ln.source_ids))
-    return FinancingOption(option_id, name, cost, max_amount, max_amount >= gap.amount, pros, cons, ids)
+    return FinancingOption(option_id, name, cost, max_amount, max_amount >= gap.amount, pros, cons, _evidence(evidence))
+
+
+def _supplier_shares(payables: list[Line], gap: Gap) -> tuple[SupplierShare, ...]:
+    by_cp: dict[int, list[Line]] = {}
+    for ln in payables:
+        by_cp.setdefault(ln.counterparty_id, []).append(ln)
+    shares = [SupplierShare(cp_id, amount := -sum(ln.face for ln in lines), amount >= gap.amount, _evidence(lines))
+              for cp_id, lines in by_cp.items()]
+    return tuple(sorted(shares, key=lambda s: (-s.amount, s.counterparty_id)))
 
 
 def rank_financing(gap: Gap, forecast: Forecast, snap: Snapshot) -> FinancingRanking:
@@ -116,11 +140,13 @@ def rank_financing(gap: Gap, forecast: Forecast, snap: Snapshot) -> FinancingRan
                 ("Cash against invoices already issued",),
                 ("Only invoices expected after the gap starts help", "Customer may learn of the factor"),
                 receivables),
-        _option("supplier_terms_extension", f"Ask suppliers for +{TERMS_EXTENSION_DAYS} days on payment terms",
-                0, -sum(ln.face for ln in payables), gap,
-                ("No cost", "Suppliers with a clean payment record"),
-                ("Supplier must agree", "Pushes the payments into a later week"),
-                payables),
+        dataclasses.replace(
+            _option("supplier_terms_extension", f"Ask suppliers for +{TERMS_EXTENSION_DAYS} days on payment terms",
+                    0, -sum(ln.face for ln in payables), gap,
+                    ("No cost", "Suppliers with a clean payment record"),
+                    ("Supplier must agree", "Pushes the payments into a later week"),
+                    payables),
+            by_counterparty=_supplier_shares(payables, gap)),
         _option("accelerate_receivables", "Offer customers a 2% early-payment discount",
                 min(amount, receivable_face) * EARLY_PAY_DISCOUNT_BP // BP, receivable_face, gap,
                 ("No debt", "Improves collections"),
