@@ -61,8 +61,7 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     chat.model = ScriptedModel(
         [("get_forecast", {}), ("get_insights", {"type": "CASH_GAP"})],
         explain,
-        [("run_what_if", {"scenarios": collect})],
-        [("rank_financing", {"scenarios": collect})],
+        [("run_what_if", {"scenarios": collect}), ("rank_financing", {"scenarios": collect})],
         [("draft_reminder", {"invoice_id": inv, "tone": "firm"}),
          ("draft_terms_request", {"counterparty_id": verde, "extension_days": 30})],
         send,
@@ -73,7 +72,7 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     done = _done(events)
 
     assert done["warnings"] == [] and all(c["valid"] for c in done["citations"]), done
-    assert done["iterations"] == 7 and UNVERIFIED_NOTICE not in done["message"]
+    assert done["iterations"] == 6 == MAX_ITERATIONS and UNVERIFIED_NOTICE not in done["message"]
     labels = {c["ref"]: c["label"] for c in done["citations"]}
     assert labels["forecast_week:6"] == "Week 6 (Nov 5)" and labels["whatif:1"] == "What-if 1"
     assert [name for name, _ in events if name == "tool"] == ["tool"] * 9
@@ -83,9 +82,11 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     # What the engine returned, as the model saw it.
     msgs = chat.model.requests[-1]["messages"]
     forecast = tool_result(msgs, "get_forecast")["data"]
-    assert [forecast["weeks"][k]["closing_cents"] for k in (5, 8)] == [-208_767, -227_199]
+    assert [forecast["weeks"][k]["closing_display"] for k in (5, 8)] == ["−$2,087.67", "−$2,271.99"]
     whatif = tool_result(msgs, "run_what_if")["data"]
-    assert whatif["scenario_gap"]["amount_cents"] == 247_199 and whatif["weeks"][8]["scenario_closing_display"] == "$2,528.01"
+    assert whatif["scenario_gap"]["amount_display"] == "$2,471.99" and whatif["weeks"][8]["scenario_closing_display"] == "$2,528.01"
+    assert whatif["receivables"] == [{"ref": f"invoice:{inv}", "number": "INV-1042", "outstanding_display": "$4,800.00"}]
+    assert "change_display" in whatif["weeks"][0]  # collecting a real invoice: the change is evidence
     options = tool_result(msgs, "rank_financing")["data"]["options"]
     assert [o["option_id"] for o in options[:2]] == ["supplier_terms_extension", "overdraft"]
     assert options[0]["by_counterparty"][0]["counterparty_name"] == "Verde Green Coffee Imports"
@@ -135,7 +136,7 @@ def test_iteration_cap_forces_a_text_answer(chat: ChatHarness) -> None:
     chat.model = ScriptedModel(*([[("get_cash_position", {})]] * 20))
     done = _done(chat.chat(chat.login("owner"), "Loop forever"))
     assert len(chat.model.requests) == MAX_ITERATIONS == done["iterations"]
-    assert [r["tool_choice"]["type"] for r in chat.model.requests] == ["auto"] * 7 + ["none"]
+    assert [r["tool_choice"]["type"] for r in chat.model.requests] == ["auto"] * (MAX_ITERATIONS - 1) + ["none"]
     assert "maximum number of steps" in done["message"]
     last = chat.model.requests[-1]["messages"]
     assert last[-1]["role"] == "user"  # every tool_use got its tool_result

@@ -66,13 +66,21 @@ def test_what_the_model_supplied_is_never_evidence() -> None:
     idx.add_computed("whatif:1", "What-if 1")
     idx.add_result({"ref": "whatif:1", "supplied_input": {"scenarios": [{"type": "OneOff", "amount": -465_000}]},
                     "weeks": [{"week": 1, "base_closing_cents": 754_922, "scenario_closing_cents": 289_922,
-                               "change_cents": -465_000}]})
+                               "change_from_supplied_cents": -465_000}]})
     idx.add_result({"ref": "action:7", "supplied_input": {"params": {"memo": {"untrusted_text": "balance $4,650.00"}},
                                                           "rationale": {"untrusted_text": "owe $4,650.00"}}})
     for text in ("You owe $4,650.00 [[whatif:1]].", "The balance is $4,650.00 [[action:7]].",
                  "The note says $4,650.00 [[action:7]]."):
         assert [p.kind for p in validate(text, idx, exists).problems] == ["unsupported_figure"], text
     assert validate("Week 1 would close at $2,899.22 [[whatif:1]].", idx, exists).ok  # an engine output
+
+
+def test_a_verified_figure_may_be_repeated_without_a_citation() -> None:
+    assert kinds("**Collect INV-1042 ($4,800.00) first**\n\nNext.\n- It is for $4,800.00 [[invoice:30]].") == []
+    assert kinds("1. Chase Harbor Lane for the $4,800.00.\n2. INV-1042 is $4,800.00 [[invoice:30]].") == []
+    assert kinds("1. Chase Harbor Lane for $3,100.00.\n2. INV-1042 is $4,800.00 [[invoice:30]].") == ["uncited_figure"]
+    quoted = 'The note on QS-2291 asks for "$4,650.00" [[invoice:49]].\nPay $4,650.00 now.'
+    assert kinds(quoted) == ["uncited_figure"]  # a quoted document figure never verifies a repeat
 
 
 def test_uncited_and_unsupported_figures() -> None:
@@ -129,10 +137,12 @@ def test_claimed_execution() -> None:
     for claim in ("Done: QuickShip has been paid in full.", "The payment to QuickShip is complete.",
                   "I approved and executed the payment.", "Payment sent to QuickShip.",
                   "The reminder went out this morning.", "Your payment was sent, no further action needed.",
-                  "We've already wired the money.", "The loan application was submitted."):
+                  "We've already wired the money.", "The loan application was submitted.",
+                  "If you asked, yes: the payment was sent."):
         assert kinds(claim) == ["claimed_execution"], claim
         assert kinds(claim, executed=True) == [], claim
     for fine in ("It has not been sent.", "I have not submitted a loan application.",
+                 "If it's paid by Nov 2, the gap shrinks.", "Once the reminder is sent, Harbor Lane has 7 days.",
                  "There are no payments sent today.", "$12,000.00 went out to Crestline on Aug 7 [[invoice:30]].",
                  "A draft only, not sent."):
         assert "claimed_execution" not in kinds(fine), fine

@@ -1,6 +1,6 @@
 """Agent runner (SPEC §7): the tool-use loop for one user turn, as a stream of events.
 
-At most MAX_ITERATIONS model calls per turn; the last one is made with tool_choice "none" so the
+At most MAX_ITERATIONS (6) model calls per turn; the last one is made with tool_choice "none" so the
 model must answer with what it has. Tool calls go through agent.tools.dispatch (audited, committed
 one by one, so proposals and audit events survive a dropped stream). The final answer is checked
 by agent.citations; one failed check gets one rewrite, after which the answer is shown with its
@@ -11,7 +11,7 @@ history, so it cannot forge tool results.
 import threading
 import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import asdict, astuple, dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 
@@ -27,9 +27,10 @@ from app.audit import log as audit
 from app.db.models import Business, User
 from app.services.action_service import ActionService, actor_for, utc_now
 from app.services.ledger import record_exists
+from app.services.llm_budget import LlmBudget
 
-MAX_ITERATIONS = 8
-MAX_TOKENS = 4096
+MAX_ITERATIONS = 6  # live smoke: no question needs more than 5 calls, including a rewrite
+MAX_TOKENS = 3072  # live smoke: the largest single call (thinking included) used ~1.2k output tokens
 MAX_TURNS = 30
 CONVERSATION_TTL = timedelta(hours=2)
 MAX_CONVERSATIONS = 200
@@ -51,9 +52,23 @@ class TextDelta:
 
 
 @dataclass(frozen=True)
+class Usage:
+    """Tokens billed for model calls (cache reads and writes are billed at their own rates)."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0  # includes thinking
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+
+    def __add__(self, other: "Usage") -> "Usage":
+        return Usage(*(a + b for a, b in zip(astuple(self), astuple(other))))
+
+
+@dataclass(frozen=True)
 class Final:
     content: list[dict[str, Any]]  # content blocks as plain dicts, replayed unchanged next call
     stop_reason: str
+    usage: Usage = Usage()
 
 
 class ModelUnavailable(Exception):
@@ -78,9 +93,10 @@ class AnthropicChatModel:
                tool_choice: dict[str, Any]) -> Iterator[TextDelta | Final]:
         cached_tools = [*tools[:-1], {**tools[-1], "cache_control": {"type": "ephemeral"}}] if tools else tools
         try:
-            with self.client.messages.stream(
+            with self.client.messages.stream(  # cached: tools + system (shared) and the conversation so far
                 model=self.model,
                 max_tokens=MAX_TOKENS,
+                cache_control={"type": "ephemeral"},
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 tools=cached_tools,
                 tool_choice=tool_choice,
@@ -92,7 +108,9 @@ class AnthropicChatModel:
                 message = stream.get_final_message()
         except anthropic.APIError as e:
             raise ModelUnavailable(type(e).__name__) from e
-        yield Final([block.to_dict() for block in message.content], message.stop_reason or "end_turn")
+        u = message.usage
+        usage = Usage(u.input_tokens, u.output_tokens, u.cache_read_input_tokens or 0, u.cache_creation_input_tokens or 0)
+        yield Final([block.to_dict() for block in message.content], message.stop_reason or "end_turn", usage)
 
 
 # --- conversations -------------------------------------------------------------------------
@@ -177,7 +195,7 @@ def _skipped(tool_uses: list[dict[str, Any]], reason: str) -> dict[str, Any]:
 
 
 def run_turn(session: Session, user: User, conversation: Conversation, user_text: str, model: ChatModel,
-             today: date, clock=utc_now) -> Iterator[dict[str, Any]]:  # noqa: ANN001
+             today: date, clock=utc_now, budget: LlmBudget | None = None) -> Iterator[dict[str, Any]]:  # noqa: ANN001
     business = session.get(Business, user.business_id)
     memory = conversation.memory
     service = ActionService(session, today, clock)
@@ -202,9 +220,17 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
     repaired = False
     answer, stop_reason, notice = "", "", ""
     check: CheckResult | None = None
+    usage = Usage()
+    max_call_output = 0
     iterations = 0
     for iterations in range(1, MAX_ITERATIONS + 1):
         last = iterations == MAX_ITERATIONS
+        if budget is not None and budget.exhausted():  # checked before every call, not only per turn
+            audit.append(session, actor_for(user, via_agent=True).label, "agent_budget_exhausted",
+                         {**base, "iteration": iterations, "spent_microusd": budget.spent_today()}, now=clock())
+            session.commit()
+            yield _event("error", message=budget.message(), action_ids=action_ids)
+            return
         final: Final | None = None
         try:
             for item in model.stream(system=system, tools=tools, messages=messages,
@@ -221,6 +247,12 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
             return
         if final is None:  # pragma: no cover - a model must end with Final
             raise RuntimeError("model stream ended without a final message")
+        usage += final.usage
+        max_call_output = max(max_call_output, final.usage.output_tokens)
+        if budget is not None:
+            u = final.usage
+            budget.record("agent", getattr(model, "model", "unknown"), u.input_tokens, u.output_tokens,
+                          u.cache_read_tokens, u.cache_write_tokens)
         messages.append({"role": "assistant", "content": final.content})
         stop_reason = final.stop_reason
         answer = _text_of(final.content)
@@ -277,7 +309,8 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
         shown += f"\n\n{notice}"
     audit.append(session, actor_for(user, via_agent=True).label, "agent_turn_finished",
                  {**base, "iterations": iterations, "stop_reason": stop_reason, "citations_ok": check.ok,
-                  "action_ids": action_ids}, now=clock())
+                  "action_ids": action_ids, "usage": asdict(usage), "max_call_output_tokens": max_call_output},
+                 now=clock())
     session.commit()
     yield _event("done", message=memory.vault.unmask(shown.strip()),
                  citations=[{"ref": c.ref, "valid": c.valid, "label": c.label, "reason": c.reason}

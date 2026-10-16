@@ -5,8 +5,10 @@ tools only *propose*: their parameters go to ActionService.propose unchanged, so
 validates them, and anything unexpected (a beneficiary name, an account number) becomes an audited
 `denied` Action instead of being dropped quietly (T1, T2). No tool can approve or execute.
 
-Tool results are JSON. Money is integer cents in `*_cents` keys plus ready-made `*_display` text,
-so the model copies figures and never formats or computes them (T7). Third-party text is wrapped as
+Tool results are compact JSON. Money is ready-made `*_display` text, so the model copies figures and
+never formats or computes them (T7); integer `*_cents` is kept only by tools whose amounts the
+model may need for an EXECUTE parameter (invoices, financing, proposals). Long source lists are cut
+to MAX_SOURCE_IDS with a count; every ref needed for a citation is kept. Third-party text is wrapped as
 {"untrusted_text": ...} (T1), and every string is PII-masked before it leaves the server (T8).
 """
 
@@ -68,6 +70,9 @@ MAX_UNTRUSTED_CHARS = 600
 MAX_RATIONALE_CHARS = 500
 MAX_EVIDENCE_IDS = 20
 MAX_PROPOSALS_PER_TURN = 3
+MAX_SOURCE_IDS = 5
+MAX_INSIGHT_EVIDENCE = 6
+LEDGER_DROP = ("currency", "category_source")  # same for every row, or not useful to the model
 MAX_SCENARIO_CENTS = 100_000_000  # $1,000,000
 MAX_SCENARIO_DAYS = 91  # 13 weeks: the forecast horizon
 INSTRUCTION_LIKE = re.compile(
@@ -140,7 +145,7 @@ class LedgerIn(_In):
     direction: InvoiceDirection | None = Field(None, description="invoices only")
     status: InvoiceStatus | None = Field(None, description="invoices only")
     needs_review: bool | None = Field(None, description="transactions only")
-    limit: int = Field(20, ge=1, le=ledger.MAX_ROWS)
+    limit: int = Field(10, ge=1, le=ledger.MAX_ROWS)
 
 
 class ForecastIn(_In):
@@ -244,24 +249,49 @@ def untrusted(text: str, source: str) -> dict[str, Any]:
     return {"untrusted_text": clean, "source": source, "instruction_like": bool(INSTRUCTION_LIKE.search(clean))}
 
 
-def present(value: Any, currency: str) -> Any:
-    """Wrap UntrustedText and add `*_display` money text next to every `*_cents` value."""
+def present(value: Any, currency: str, cents: bool = False) -> Any:
+    """Wrap UntrustedText and turn every `*_cents` value into `*_display` money text (keeping the
+    integer too when `cents`)."""
     if isinstance(value, UntrustedText):
         return untrusted(value.text, value.source)
     if isinstance(value, dict):
         out: dict[str, Any] = {}
         for key, v in value.items():
-            out[key] = present(v, currency)
-            if key.endswith("_cents"):
+            if key.endswith("_cents") and isinstance(v, (int, list)):
+                if cents:
+                    out[key] = v
                 display = key[: -len("_cents")] + "_display"
-                if isinstance(v, int):
-                    out[display] = money(v, currency)
-                elif isinstance(v, list):
-                    out[display] = [money(x, currency) for x in v]
+                out[display] = money(v, currency) if isinstance(v, int) else [money(x, currency) for x in v]
+            else:
+                out[key] = present(v, currency, cents)
         return out
     if isinstance(value, (list, tuple)):
-        return [present(v, currency) for v in value]
+        return [present(v, currency, cents) for v in value]
     return value
+
+
+def sources(ids: tuple[str, ...] | list[str]) -> dict[str, Any]:
+    """Source refs, cut to the first MAX_SOURCE_IDS (most specific first) plus how many more."""
+    out: dict[str, Any] = {"source_ids": list(ids[:MAX_SOURCE_IDS])}
+    if len(ids) > MAX_SOURCE_IDS:
+        out["more_sources"] = len(ids) - MAX_SOURCE_IDS
+    return out
+
+
+def _insight(i: Any) -> dict[str, Any]:
+    row = ledger.insight_dict(i)
+    for key in ("currency", "status", "detected_at"):
+        row.pop(key)
+    ids = row.pop("evidence_ids")
+    row["evidence_ids"] = ids[:MAX_INSIGHT_EVIDENCE]
+    if len(ids) > MAX_INSIGHT_EVIDENCE:
+        row["more_evidence"] = len(ids) - MAX_INSIGHT_EVIDENCE
+    return row
+
+
+def _compact_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in row.items() if v is not None and k not in LEDGER_DROP
+            and not (k == "needs_review" and v is False)}
 
 
 def week_label(week: int, start: date) -> str:
@@ -350,15 +380,19 @@ def _get_ledger(ctx: ToolContext, p: LedgerIn) -> dict[str, Any]:
         rows = ledger.query_invoices(ctx.session, ctx.business.id, ctx.today, direction=p.direction, status=p.status,
                                      counterparty_id=p.counterparty_id, date_from=p.date_from, date_to=p.date_to,
                                      limit=p.limit)
-    return {"record": p.record, "count": len(rows), "rows": rows}
+    return {"record": p.record, "count": len(rows), "rows": [_compact_row(r) for r in rows]}
 
 
 def _lines(forecast: Forecast, week: int, snap: Snapshot) -> list[dict[str, Any]]:
-    return [{"date": ln.on.isoformat(), "kind": ln.kind.value, "amount_cents": ln.amount,
-             "probability": _probability(ln.probability_bp), "source_ids": list(ln.source_ids),
-             "counterparty_name": snap.counterparties[ln.counterparty_id].name
-             if ln.counterparty_id in snap.counterparties else None}
-            for ln in forecast.lines_in(week)]
+    out = []
+    for ln in forecast.lines_in(week):
+        line: dict[str, Any] = {"date": ln.on.isoformat(), "kind": ln.kind.value, "amount_cents": ln.amount}
+        if ln.counterparty_id in snap.counterparties:
+            line["counterparty_name"] = snap.counterparties[ln.counterparty_id].name
+        if ln.probability_bp < CERTAIN_BP:
+            line["probability"] = _probability(ln.probability_bp)
+        out.append(line | sources(ln.source_ids))
+    return out
 
 
 def _get_forecast(ctx: ToolContext, p: ForecastIn) -> dict[str, Any]:
@@ -370,21 +404,21 @@ def _get_forecast(ctx: ToolContext, p: ForecastIn) -> dict[str, Any]:
     weeks = []
     for w in forecast.weeks:
         row: dict[str, Any] = {"ref": f"forecast_week:{w.week}", "label": week_label(w.week, w.start),
-                               "start": w.start.isoformat(), "opening_cents": w.opening, "inflows_cents": w.inflows,
-                               "outflows_cents": w.outflows, "closing_cents": w.closing,
+                               "inflows_cents": w.inflows, "outflows_cents": w.outflows, "closing_cents": w.closing,
                                "below_buffer": w.below_buffer}
         if w.week in focus:
             row["lines"] = _lines(forecast, w.week, snap)
         weeks.append(row)
-    return {"as_of": forecast.as_of.isoformat(), "currency": forecast.currency,
+    return {"as_of": forecast.as_of.isoformat(), "opening_cents": forecast.weeks[0].opening,
             "min_cash_buffer_cents": forecast.min_cash_buffer, "gap": _base_gap(forecast), "weeks": weeks,
             "at_risk_receivables": forecast.assumptions.get("at_risk_receivables", []),
-            "note": "Each week's lines show what drives it; source_ids are the records behind each line."}
+            "note": "Lines are listed for the first and lowest weeks under the buffer (or the requested week); "
+                    "ask for another week to see its lines."}
 
 
 def _get_insights(ctx: ToolContext, p: InsightsIn) -> dict[str, Any]:
     rows = ledger.list_insights(ctx.session, ctx.business.id, type_=p.type, status=p.status)
-    return {"count": len(rows), "insights": [ledger.insight_dict(i) for i in rows]}
+    return {"count": len(rows), "insights": [_insight(i) for i in rows]}
 
 
 def _explain_record(ctx: ToolContext, p: ExplainIn) -> dict[str, Any]:
@@ -403,11 +437,18 @@ def _run_what_if(ctx: ToolContext, p: WhatIfIn) -> dict[str, Any]:
     ref = f"whatif:{ctx.memory.whatif_runs}"
     ctx.memory.index.add_computed(ref, f"What-if {ctx.memory.whatif_runs}")
     _register_weeks(ctx, base)
-    weeks = [{"week": b.week, "start": b.start.isoformat(), "base_closing_cents": b.closing,
-              "scenario_closing_cents": s.closing, "change_cents": d, "below_buffer": s.below_buffer}
+    # A change that only reflects an amount the model chose is not evidence (see agent/citations.py).
+    change = "change_from_supplied_cents" if any(isinstance(s, (OneOff, AddRecurring)) for s in scenarios) \
+        else "change_cents"
+    weeks = [{"week": b.week, "base_closing_cents": b.closing, "scenario_closing_cents": s.closing, change: d,
+              "below_buffer": s.below_buffer}
              for b, s, d in zip(base.weeks, result.scenario.weeks, result.closing_delta)]
+    receivables = [ledger.explain(ctx.session, ctx.business.id, f"invoice:{s.invoice_id}", ctx.today)
+                   for s in scenarios if isinstance(s, (CollectReceivable, DelayReceivable))]
     return {"ref": ref, "label": f"What-if {ctx.memory.whatif_runs}",
             "supplied_input": {"scenarios": result.scenario.assumptions["scenarios"]},
+            "receivables": [{"ref": r["ref"], "number": r["number"], "outstanding_cents": r["outstanding_cents"]}
+                            for r in receivables],
             "min_cash_buffer_cents": base.min_cash_buffer,
             "base_gap": _base_gap(base), "scenario_gap": _gap(result.scenario.gap()), "weeks": weeks,
             "note": "A simulation only; nothing in the books was changed."}
@@ -447,7 +488,8 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
 
 def _draft_reminder(ctx: ToolContext, p: DraftReminderIn) -> dict[str, Any]:
     draft = ctx.service.record_draft(actor_for(ctx.user, via_agent=True), p.invoice_id, p.tone)
-    return {**ledger.action_dict(draft), "draft_id": draft.id, "note": NOT_SENT}
+    return {**ledger.action_dict(draft), "draft_id": draft.id, "outstanding_cents": draft.result["outstanding"],
+            "note": NOT_SENT}
 
 
 def _draft_terms_request(ctx: ToolContext, p: TermsRequestIn) -> dict[str, Any]:
@@ -493,6 +535,10 @@ def _propose(ctx: ToolContext, tool: str, raw: dict[str, Any]) -> tuple[dict[str
                                  rationale=rationale[:MAX_RATIONALE_CHARS], evidence_ids=tuple(evidence))
     status = action.status.value
     data: dict[str, Any] = {"ref": f"action:{action.id}", "action_id": action.id, "tool": tool, "status": status}
+    invoice_id = params.get("invoice_id")
+    if isinstance(invoice_id, int) and ledger.record_exists(ctx.session, ctx.business.id, f"invoice:{invoice_id}"):
+        inv = ledger.explain(ctx.session, ctx.business.id, f"invoice:{invoice_id}", ctx.today)
+        data["invoice"] = {"ref": inv["ref"], "number": inv["number"], "outstanding_cents": inv["outstanding_cents"]}
     if status == "denied":
         data |= {"reason": (action.result or {}).get("denied", ""), "next_step": DENIED}
     elif status == "proposed":
@@ -509,6 +555,7 @@ class ToolSpec:
     description: str
     input_model: type[BaseModel]
     handler: Callable[[ToolContext, Any], dict[str, Any]] | None  # None = EXECUTE (proposal)
+    cents: bool = False  # keep integer *_cents next to *_display (amounts the model may need for EXECUTE)
 
     @property
     def tier(self) -> Tier:
@@ -524,7 +571,7 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
              NoInput, _get_cash_position),
     ToolSpec("get_ledger", "List bank transactions or invoices (newest first) with filters. Invoice lists show "
              "outstanding balances and days past due but not invoice notes; use explain_record for those.",
-             LedgerIn, _get_ledger),
+             LedgerIn, _get_ledger, cents=True),
     ToolSpec("get_forecast", "The 13-week cash forecast from today: weekly opening/inflows/outflows/closing, "
              "whether each week is below the buffer, the gap, and the lines driving the gap weeks (or a chosen "
              "week) with their source records.", ForecastIn, _get_forecast),
@@ -532,14 +579,14 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
              "creep, cash gaps, unusual expenses) with impact and evidence.", InsightsIn, _get_insights),
     ToolSpec("explain_record", "Full detail of one record by reference, e.g. invoice:30 (lines, outstanding, "
              "days past due, notes), counterparty:6 (payment history, payee allowlist), recurring_series:2, "
-             "transaction:5, insight:4, action:12, account:1.", ExplainIn, _explain_record),
+             "transaction:5, insight:4, action:12, account:1.", ExplainIn, _explain_record, cents=True),
     ToolSpec("run_what_if", "Simulate the forecast with scenario changes (collect or delay a receivable, add a "
              "recurring cost/income, a one-off payment, remove a recurring series) and compare with the base "
              "forecast. Changes nothing.", WhatIfIn, _run_what_if),
     ToolSpec("rank_financing", "Rank ways to cover the cash gap (sandbox catalog: overdraft, short-term loan, "
              "invoice factoring, supplier terms extension, early-payment discount) by cost. The gap comes from "
              "the forecast, optionally after what-if scenarios; you never pass an amount.",
-             FinancingIn, _rank_financing),
+             FinancingIn, _rank_financing, cents=True),
     ToolSpec("draft_reminder", "Draft a payment reminder for an open receivable from a fixed template. Returns "
              "the draft (draft_id); nothing is sent. Use send_reminder to propose sending it.",
              DraftReminderIn, _draft_reminder),
@@ -629,7 +676,7 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
         return _error(ctx, name, tier, tool_input, f"invalid input ({problems})")
     except (ToolInputError, ScenarioError, ActionError) as e:
         return _error(ctx, name, tier, tool_input, getattr(e, "detail", None) or str(e))
-    shown = ctx.memory.vault.mask(present(data, ctx.business.base_currency))
+    shown = ctx.memory.vault.mask(present(data, ctx.business.base_currency, cents=spec.cents or spec.handler is None))
     ctx.memory.index.add_result(shown)
     _audit_call(ctx, name, tier, tool_input, True, action)
     return ToolOutcome(_result(name, True, {"data": shown}), False, tier, action)

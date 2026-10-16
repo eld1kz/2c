@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,7 +15,9 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://ledgerwise:ledgerwise@localhost:5432/ledgerwise"
     anthropic_api_key: str = ""
-    llm_model: str = ""
+    llm_model: str = ""  # the agent
+    llm_model_classifier: str = ""  # transaction categorizer; falls back to llm_model
+    daily_llm_budget_usd: Decimal = Decimal("2")  # hard daily cap on LLM spend (UTC day)
     jwt_secret: str = ""
     demo_today: date = DEFAULT_DEMO_TODAY
     cors_origins: str = "http://localhost:3000"

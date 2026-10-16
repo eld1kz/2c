@@ -47,6 +47,14 @@ class RecordNotFound(LookupError):
     pass
 
 
+def _stats(stats: dict[str, Any]) -> dict[str, Any]:
+    """Payment stats, with the on-time rate also as a ready-made percentage (no arithmetic for callers)."""
+    out = dict(stats)
+    if isinstance(stats.get("on_time_rate"), (int, float)):
+        out["on_time_display"] = f"{round(stats['on_time_rate'] * 100)}%"
+    return out
+
+
 def ref(kind: str, id_: int | None) -> str | None:
     return None if id_ is None else f"{kind}:{id_}"
 
@@ -221,7 +229,7 @@ def explain(session: Session, business_id: int, record_ref: str, today: date) ->
                 "kind": c.kind.value,
                 "is_allowed_payee": c.is_allowed_payee,
                 "has_contact_email": bool(c.contact_email),
-                "stats": dict(c.stats or {}),
+                "stats": _stats(c.stats or {}),
                 "open_invoices": [_invoice(session, i, today) for i in open_invoices],
             }
         case "recurring_series":

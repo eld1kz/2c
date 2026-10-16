@@ -7,7 +7,7 @@ to a JSON schema and re-validated here.
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 from pydantic import BaseModel, Field, ValidationError
@@ -15,6 +15,9 @@ from pydantic import BaseModel, Field, ValidationError
 from app.config import Settings
 from app.db.models import Category
 from app.engine.categorize import Classifier, ClassifyItem, ClassifyResult, NullClassifier
+
+if TYPE_CHECKING:
+    from app.services.llm_budget import LlmBudget
 
 log = logging.getLogger(__name__)
 
@@ -78,13 +81,20 @@ def build_user_message(items: list[ClassifyItem]) -> str:
 
 
 class AnthropicClassifier:
-    def __init__(self, client: Any, model: str) -> None:
+    """Calls the API per batch. With a `budget`, each call is recorded and no call is made once the
+    daily AI budget is spent; unclassified items then go to the review queue."""
+
+    def __init__(self, client: Any, model: str, budget: "LlmBudget | None" = None) -> None:
         self.client = client
         self.model = model
+        self.budget = budget
 
     def classify(self, items: list[ClassifyItem]) -> list[ClassifyResult]:
         results: list[ClassifyResult] = []
         for start in range(0, len(items), BATCH_SIZE):
+            if self.budget is not None and self.budget.exhausted():
+                log.warning("daily AI budget reached; %d transactions go to review", len(items) - start)
+                break
             results.extend(self._classify_batch(items[start:start + BATCH_SIZE]))
         return results
 
@@ -97,6 +107,10 @@ class AnthropicClassifier:
                 messages=[{"role": "user", "content": build_user_message(batch)}],
                 output_config={"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
             )
+            if self.budget is not None:
+                u = response.usage
+                self.budget.record("classifier", self.model, u.input_tokens, u.output_tokens,
+                                   u.cache_read_input_tokens or 0, u.cache_creation_input_tokens or 0)
             if response.stop_reason != "end_turn":
                 log.warning("classifier stopped with %s; batch goes to review", response.stop_reason)
                 return []
@@ -109,7 +123,9 @@ class AnthropicClassifier:
         return [ClassifyResult(r.index, r.category.value, r.confidence) for r in reply.results if r.index in wanted]
 
 
-def classifier_from_settings(settings: Settings) -> Classifier:
-    if not settings.anthropic_api_key or not settings.llm_model:
+def classifier_from_settings(settings: Settings, budget: "LlmBudget | None" = None) -> Classifier:
+    """LLM_MODEL_CLASSIFIER (a cheaper model) if set, else LLM_MODEL; no key or model → no LLM."""
+    model = settings.llm_model_classifier or settings.llm_model
+    if not settings.anthropic_api_key or not model:
         return NullClassifier()
-    return AnthropicClassifier(anthropic.Anthropic(api_key=settings.anthropic_api_key), settings.llm_model)
+    return AnthropicClassifier(anthropic.Anthropic(api_key=settings.anthropic_api_key), model, budget)

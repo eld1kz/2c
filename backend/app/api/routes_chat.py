@@ -2,7 +2,9 @@
 by role). Rate limited per user (T10): 10 turns a minute, 100 a day, one turn in flight at a time.
 
 Limits count the `agent_turn_started` audit events, like the login lockout, so they survive restarts
-and hold across workers. Every check runs before a conversation is created, so refused requests
+and hold across workers. The daily AI budget (DAILY_LLM_BUDGET_USD) is checked here and again before
+every model call; once it is spent, chat answers "daily AI budget reached" (503, audited) without
+calling the API. Every check runs before a conversation is created, so refused requests
 leave nothing behind. The in-flight lock is released whenever the response ends, including when the
 client disconnects before streaming starts. Refusals are audited: the first few per user per minute
 in full, then one summary event, so a flood cannot grow the audit log without bound.
@@ -26,12 +28,13 @@ from app.audit import log as audit
 from app.config import Settings, get_settings
 from app.db.models import AuditEvent, Role, User
 from app.services.action_service import utc_now
+from app.services.llm_budget import LlmBudget, to_microusd
 
 router = APIRouter(tags=["chat"])
 conversations = ConversationStore()
 LIMITS = ((timedelta(minutes=1), 10), (timedelta(days=1), 100))
 CHAT_ROLES = (Role.owner, Role.accountant, Role.viewer)  # viewers chat with READ tools only
-REFUSAL_EVENTS = ("chat_rate_limited", "chat_refused")
+REFUSAL_EVENTS = ("chat_rate_limited", "chat_refused", "chat_budget_exhausted")
 REFUSAL_AUDITS_PER_WINDOW = 5
 REFUSAL_WINDOW = timedelta(minutes=1)
 SUPPRESSED = "chat_refusals_suppressed"
@@ -42,13 +45,14 @@ def _count(session: Session, actor: str, event_types: tuple[str, ...], since: An
         AuditEvent.actor == actor, AuditEvent.event_type.in_(event_types), AuditEvent.ts >= since))
 
 
-def _refuse(session: Session, user: User, code: int, reason: str,
-            headers: dict[str, str] | None = None) -> NoReturn:
+def _refuse(session: Session, user: User, code: int, reason: str, headers: dict[str, str] | None = None,
+            event: str | None = None) -> NoReturn:
     actor, now = f"user:{user.id}", utc_now()
     logged = _count(session, actor, REFUSAL_EVENTS, now - REFUSAL_WINDOW)
     payload = {"business_id": user.business_id, "reason": reason}
     if logged < REFUSAL_AUDITS_PER_WINDOW:
-        audit.append(session, actor, "chat_rate_limited" if code == 429 else "chat_refused", payload, now=now)
+        audit.append(session, actor, event or ("chat_rate_limited" if code == 429 else "chat_refused"), payload,
+                     now=now)
     elif not _count(session, actor, (SUPPRESSED,), now - REFUSAL_WINDOW):
         audit.append(session, actor, SUPPRESSED, payload | {
             "note": f"more than {REFUSAL_AUDITS_PER_WINDOW} refusals in {REFUSAL_WINDOW}; the rest are not logged"},
@@ -87,8 +91,13 @@ def chat(body: ChatIn, user: User = Depends(current_user), session: Session = De
         if _count(session, f"user:{user.id}", ("agent_turn_started",), now - window) >= limit:
             _refuse(session, user, 429, f"chat limit reached ({limit} per {window})",
                     {"Retry-After": str(int(window.total_seconds()))})
+    budget = LlmBudget(session, to_microusd(settings.daily_llm_budget_usd), utc_now)
+    if budget.exhausted():
+        _refuse(session, user, 503, budget.message(), {"Retry-After": str(budget.seconds_until_reset())},
+                event="chat_budget_exhausted")
     if not conversations.begin(user.id):
         _refuse(session, user, 429, "a reply is still streaming", {"Retry-After": "5"})
+    limit = budget.limit
     user_id, message, today = user.id, body.message, settings.demo_today
     release = lambda: conversations.end(user_id)  # noqa: E731 - idempotent
     try:
@@ -104,7 +113,9 @@ def chat(body: ChatIn, user: User = Depends(current_user), session: Session = De
         try:
             with session_factory() as turn_session:
                 turn_user = turn_session.get(User, user_id)
-                for event in run_turn(turn_session, turn_user, conversation, message, model, today):
+                turn_budget = LlmBudget(turn_session, limit, utc_now)
+                for event in run_turn(turn_session, turn_user, conversation, message, model, today,
+                                      budget=turn_budget):
                     yield _sse(event)
         finally:
             release()

@@ -5,7 +5,9 @@ money amounts and percentages each one carries. `validate` checks the agent's fi
 - each [[type:id]] is well formed, of a known type, exists (DB records: in this business) and was
   seen in a tool result in this conversation;
 - each sentence stating money or a percentage cites something (in the sentence, or else anywhere
-  in the same line / bullet), and one of those citations carries that exact figure;
+  in the same line / bullet), and one of those citations carries that exact figure; a figure the
+  answer already verified elsewhere (e.g. repeated in a heading or the summary line) needs no
+  second citation;
 - a figure that only appears in a cited record's untrusted text (e.g. the amount an invoice note
   asks for) is accepted only when it is explicitly framed as a quote: inside quotation marks, or
   after "the note says / the invoice text claims …" in the same sentence;
@@ -14,8 +16,8 @@ money amounts and percentages each one carries. `validate` checks the agent's fi
 Figures inside "untrusted_text" wrappers are kept apart (`quoted`), so a figure in a document can be
 quoted as what the document says but never backs a statement of fact. Values someone supplied
 rather than the engine derived (under a `supplied_input` key: what-if scenario inputs, action params
-and rationales) and a what-if's per-week `change_cents` (which equals the scenario input) are never
-evidence at all.
+and rationales) and a what-if's per-week change when it only reflects an amount the model chose
+(`change_from_supplied_*`) are never evidence at all.
 Money is recognised as $1,234.56, ＄1,234 (text is NFKC-normalised first), USD 1,234 and
 1,234 dollars; bare numbers such as day or week counts are not checked.
 """
@@ -32,7 +34,7 @@ COMPUTED_TYPES = ("forecast_week", "whatif", "financing")
 KNOWN_TYPES = (*REF_TYPES, *COMPUTED_TYPES)
 UNTRUSTED_KEY = "untrusted_text"
 SUPPLIED_KEY = "supplied_input"  # values the model (or a user) chose: shown, never evidence
-NOT_EVIDENCE_KEYS = frozenset({SUPPLIED_KEY, "change_cents", "change_display"})
+NOT_EVIDENCE_KEYS = frozenset({SUPPLIED_KEY, "change_from_supplied_cents", "change_from_supplied_display"})
 
 CITATION = re.compile(r"\[\[([^\[\]]{0,80})\]\]")
 REF = re.compile(r"^([a-z_]+):([A-Za-z0-9_]+)$")
@@ -58,6 +60,7 @@ CLAIM = re.compile(  # past or perfect tense about an action; a negation must si
     rf"|^\W*done\b",  # "Done: …"
     re.IGNORECASE)
 HEADING = re.compile(r"^\s*(?:#{1,6}\s+.*|\*\*[^*]+\*\*:?)\s*$")  # a markdown heading or a bold-only line
+CONDITIONAL = re.compile(r"\b(?:if|when|whenever|once|unless|until|after|before|should)\b", re.IGNORECASE)
 QUOTE_FRAME = re.compile(  # "the note says", "the invoice text claims", "according to the note"
     r"\b(?:the|this|that|its|qs-\d+'s|[\w-]+'s)\s+(?:invoice\s+|supplier'?s?\s+)?"
     r"(?:notes?|memo|invoice text|text|document|description|line description|message|instruction)"
@@ -90,6 +93,12 @@ def _figure_matches(text: str) -> list[tuple[Figure, str, int]]:
 
 def figures_in(text: str) -> list[tuple[Figure, str]]:
     return [(f, w) for f, w, _ in _figure_matches(normalize(text))]
+
+
+def _conditional(sentence: str, position: int) -> bool:
+    """Whether the claim at `position` sits in a conditional clause ("If it's paid by Nov 2, …")."""
+    clause = re.split(r"[,;:—–]", sentence[:position])[-1]
+    return bool(CONDITIONAL.search(clause))
 
 
 def framed_as_quote(sentence: str, position: int) -> bool:
@@ -245,6 +254,8 @@ def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], exe
             citations[raw] = c = _check_ref(raw, index, exists)
             if not c.valid:
                 problems.append(Problem(c.reason or "invalid", f"[[{raw}]] {REASON_TEXT.get(c.reason or '', 'is invalid')}"))
+    verified: set[Figure] = set()
+    uncited: list[tuple[Figure, str]] = []
     all_blocks = blocks(text)
     for n, block in enumerate(all_blocks):
         block_refs = [r for s in block for r in CITATION.findall(s)]
@@ -256,17 +267,21 @@ def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], exe
             plain = CITATION.sub(" ", sentence)
             for figure, written, position in _figure_matches(plain):
                 if not refs:
-                    problems.append(Problem("uncited_figure", f"'{written}' has no citation in its sentence or line"))
-                elif cited and not any(figure in index.values.get(c.ref, set()) for c in cited):
+                    uncited.append((figure, written))
+                elif any(figure in index.values.get(c.ref, set()) for c in cited):
+                    verified.add(figure)
+                elif cited:
                     names = ", ".join(f"[[{c.ref}]]" for c in cited)
                     if any(figure in index.quoted.get(c.ref, set()) for c in cited):
-                        if not framed_as_quote(plain, position):
+                        if not framed_as_quote(plain, position):  # a quote never verifies a repeat
                             problems.append(Problem("unsupported_figure", (
                                 f"'{written}' appears only in document text of {names}; quote it explicitly "
                                 "(\"the note says …\" or in quotation marks), never as a fact")))
                     else:
                         problems.append(Problem("unsupported_figure", f"'{written}' does not appear in {names}"))
-            if not executed and CLAIM.search(plain):
+            if not executed and any(not _conditional(plain, m.start()) for m in CLAIM.finditer(plain)):
                 problems.append(Problem("claimed_execution",
                                         f"'{sentence[:80]}' claims an action happened, but no tool result says executed"))
+    problems += [Problem("uncited_figure", f"'{written}' has no citation in its sentence or line")
+                 for figure, written in uncited if figure not in verified]
     return CheckResult(tuple(citations.values()), tuple(problems))

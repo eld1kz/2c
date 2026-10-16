@@ -472,3 +472,24 @@ class SandboxLoanApplication(Base):
     status: Mapped[LoanStatus] = mapped_column(_enum(LoanStatus))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     decided_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# --- LLM spend -------------------------------------------------------------
+
+
+class LlmUsage(Base):
+    """One billed model call (agent or categorizer). Cost in integer micro-dollars; `day` is the UTC
+    calendar day the daily budget is counted on (real spend, so wall clock, not DEMO_TODAY)."""
+
+    __tablename__ = "llm_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ts: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    day: Mapped[dt.date] = mapped_column(Date, index=True)
+    source: Mapped[str] = mapped_column(String(20))  # agent | classifier
+    model: Mapped[str] = mapped_column(String(100))
+    input_tokens: Mapped[int] = mapped_column(Integer)
+    output_tokens: Mapped[int] = mapped_column(Integer)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer)
+    cost_microusd: Mapped[int] = mapped_column(BigInteger)

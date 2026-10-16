@@ -13,7 +13,7 @@ from app.auth.jwt import InvalidToken, read_token
 from app.config import Settings, get_settings
 from app.db.models import User
 from app.engine.categorize import Classifier
-from app.services.action_service import ActionError, ActionService
+from app.services.action_service import ActionError, ActionService, utc_now
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -52,10 +52,11 @@ def action_service(session: Session = Depends(get_session), settings: Settings =
     return ActionService(session, settings.demo_today)
 
 
-def get_classifier(settings: Settings = Depends(get_settings)) -> Classifier:
+def get_classifier(settings: Settings = Depends(get_settings), session: Session = Depends(get_session)) -> Classifier:
     from app.engine.llm_classifier import classifier_from_settings
+    from app.services.llm_budget import LlmBudget, to_microusd
 
-    return classifier_from_settings(settings)
+    return classifier_from_settings(settings, LlmBudget(session, to_microusd(settings.daily_llm_budget_usd), utc_now))
 
 
 def get_session_factory() -> Callable[[], Session]:

@@ -17,6 +17,7 @@ from app.db.models import (
     Tier,
 )
 from app.engine.forecast import project
+from app.engine.insights.base import money
 from app.engine.snapshot import load_snapshot
 from app.policy.tiers import TOOL_TIERS
 from app.services.action_service import Forbidden
@@ -130,7 +131,8 @@ def test_supplied_values_come_back_marked_and_are_never_evidence(demo: Demo) -> 
     ctx = _ctx(demo)
     whatif = _call(ctx, "run_what_if", scenarios=[{"type": "one_off", "amount_cents": -465_000, "on": "2026-10-02"}])[0]
     assert whatif["data"]["supplied_input"]["scenarios"][0]["amount"] == -465_000
-    assert ("money", "465000") not in ctx.memory.index.values["whatif:1"]  # the input, and its change_cents
+    assert ("money", "465000") not in ctx.memory.index.values["whatif:1"]  # the input, and the change it causes
+    assert "change_from_supplied_display" in whatif["data"]["weeks"][0]
     inputs = _execute_inputs(demo, ctx)["schedule_payment"]
     denied = _call(ctx, "schedule_payment", **inputs, memo="balance $4,650.00 verified",
                    rationale="QuickShip owes $4,650.00")[0]["data"]
@@ -152,14 +154,17 @@ def test_read_tools_return_engine_numbers(demo: Demo) -> None:
     ctx = _ctx(demo)
     base = project(load_snapshot(demo.session, demo.business.id, DEFAULT_DEMO_TODAY))
     forecast, _ = _call(ctx, "get_forecast")
-    assert [w["closing_cents"] for w in forecast["data"]["weeks"]] == [w.closing for w in base.weeks]
-    assert forecast["data"]["gap"]["amount_cents"] == base.gap().amount
+    assert [w["closing_display"] for w in forecast["data"]["weeks"]] == [money(w.closing, "USD") for w in base.weeks]
+    assert forecast["data"]["gap"]["amount_display"] == money(base.gap().amount, "USD")
+    assert "closing_cents" not in forecast["data"]["weeks"][0]  # display only: no amount feeds an EXECUTE call
+    week6 = forecast["data"]["weeks"][5]["lines"]
+    assert all(len(ln["source_ids"]) <= 5 for ln in week6) and any(ln.get("more_sources") for ln in week6)
     assert forecast["data"]["gap"]["evidence_ids"][0] == "forecast_week:6"
     assert forecast["data"]["gap"]["min_cash_buffer_display"] == "$5,000.00"
     assert ctx.memory.index.values["forecast_week:6"] >= {("money", str(base.gap().amount)), ("money", "500000")}
     assert "lines" in forecast["data"]["weeks"][5] and forecast["data"]["weeks"][5]["closing_display"] == "−$2,087.67"
     cash, _ = _call(ctx, "get_cash_position")
-    assert cash["data"]["cash_cents"] == base.weeks[0].opening
+    assert cash["data"]["cash_display"] == money(base.weeks[0].opening, "USD")
 
 
 def test_ledger_rows_resolve_and_hide_notes(demo: Demo) -> None:
@@ -170,6 +175,9 @@ def test_ledger_rows_resolve_and_hide_notes(demo: Demo) -> None:
     for r in rows:
         detail, out = _call(ctx, "explain_record", ref=r["ref"])
         assert not out.is_error and detail["data"]["number"] == r["number"]
+    quickship = _call(ctx, "explain_record", ref=f"counterparty:{demo.counterparties['QuickShip Logistics'].id}")[0]
+    assert quickship["data"]["stats"]["on_time_display"] == "100%"
+    assert ("pct", "100.0") in ctx.memory.index.values[quickship["data"]["ref"]]
     txs = _call(ctx, "get_ledger", record="transactions", limit=3)[0]["data"]["rows"]
     assert len(txs) == 3 and all("untrusted_text" in t["description"] for t in txs)
 

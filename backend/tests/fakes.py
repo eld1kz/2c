@@ -29,10 +29,12 @@ class ScriptedModel:
     ("tool_name", {input}) tuple (a tool call). When the script runs out it answers "Okay."
     """
 
-    def __init__(self, *steps: object) -> None:
+    def __init__(self, *steps: object, usage: object = None, model: str = "claude-sonnet-5-5") -> None:
         self.steps = list(steps)
         self.requests: list[dict] = []
         self._ids = 0
+        self.usage = usage  # a runner.Usage billed for every call (default: none)
+        self.model = model
 
     def stream(self, *, system: str, tools: list[dict], messages: list[dict], tool_choice: dict):  # noqa: ANN201
         from app.agent.runner import Final, TextDelta
@@ -50,7 +52,8 @@ class ScriptedModel:
             else:
                 self._ids += 1
                 blocks.append({"type": "tool_use", "id": f"toolu_{self._ids:03d}", "name": item[0], "input": item[1]})
-        yield Final(blocks, "tool_use" if any(b["type"] == "tool_use" for b in blocks) else "end_turn")
+        stop = "tool_use" if any(b["type"] == "tool_use" for b in blocks) else "end_turn"
+        yield Final(blocks, stop, self.usage) if self.usage is not None else Final(blocks, stop)
 
     @property
     def sent(self) -> str:
