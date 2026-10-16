@@ -101,6 +101,9 @@ def test_read_tools_return_engine_numbers(demo: Demo) -> None:
     forecast, _ = _call(ctx, "get_forecast")
     assert [w["closing_cents"] for w in forecast["data"]["weeks"]] == [w.closing for w in base.weeks]
     assert forecast["data"]["gap"]["amount_cents"] == base.gap().amount
+    assert forecast["data"]["gap"]["evidence_ids"][0] == "forecast_week:6"
+    assert forecast["data"]["gap"]["min_cash_buffer_display"] == "$5,000.00"
+    assert ctx.memory.index.values["forecast_week:6"] >= {("money", str(base.gap().amount)), ("money", "500000")}
     assert "lines" in forecast["data"]["weeks"][5] and forecast["data"]["weeks"][5]["closing_display"] == "−$2,087.67"
     cash, _ = _call(ctx, "get_cash_position")
     assert cash["data"]["cash_cents"] == base.weeks[0].opening

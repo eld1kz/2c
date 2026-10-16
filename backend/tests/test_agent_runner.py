@@ -90,6 +90,7 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     assert [o["option_id"] for o in options[:2]] == ["supplier_terms_extension", "overdraft"]
     assert options[0]["by_counterparty"][0]["counterparty_name"] == "Verde Green Coffee Imports"
     assert options[0]["by_counterparty"][0]["covers_gap_alone"] is True
+    assert "financing:overdraft" in tool_result(msgs, "rank_financing")["data"]["gap"]["evidence_ids"]
 
     # The approvals queue holds exactly the reminder; the drafts are stored but not approvable.
     pending = chat.client.get("/actions", params={"status": "proposed"}, headers=owner).json()
@@ -167,7 +168,8 @@ def test_failed_citation_check_is_repaired_once(chat: ChatHarness) -> None:
                                [f"INV-1042 is for $3,100.00 [[invoice:{inv}]]."],
                                [f"INV-1042 is for $4,800.00 [[invoice:{inv}]]."])
     events = chat.chat(chat.login("owner"), "How much is INV-1042?")
-    assert ("reset", {"reason": "citation_check"}) in events
+    (reset,) = [data for name, data in events if name == "reset"]
+    assert reset["problems"] == [f"'$3,100.00' does not appear in [[invoice:{inv}]]"]
     feedback = chat.model.requests[2]["messages"][-1]["content"]
     assert "'$3,100.00' does not appear in" in feedback and "not the user" in feedback
     done = _done(events)

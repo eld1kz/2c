@@ -4,10 +4,14 @@
 money amounts and percentages each one carries. `validate` checks the agent's final text:
 - each [[type:id]] is well formed, of a known type, exists (DB records: in this business) and was
   seen in a tool result in this conversation;
-- each sentence stating money or a percentage cites something, and one of its citations carries
-  that exact figure;
+- each sentence stating money or a percentage cites something (in the sentence, or else anywhere
+  in the same line / bullet), and one of those citations carries that exact figure;
+- a figure that only appears in a cited record's untrusted text (e.g. the amount an invoice note
+  asks for) is accepted only when it is attributed to the document ("the note asks for") in the
+  same line, or in the line introducing the list it is in;
 - it does not claim an action was sent/paid/executed unless a tool result said `executed`.
-Text inside "untrusted_text" wrappers is never indexed, so a figure in a document cannot back a claim.
+Figures inside "untrusted_text" wrappers are kept apart (`quoted`), so a figure in a document can be
+quoted as what the document says but never backs a statement of fact.
 """
 
 import re
@@ -25,11 +29,19 @@ CITATION = re.compile(r"\[\[([^\[\]]{0,80})\]\]")
 REF = re.compile(r"^([a-z_]+):([A-Za-z0-9_]+)$")
 MONEY = re.compile(r"(?<![\w.,])[−-]?\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d|[.,]\d)")
 PERCENT = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s?%")
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n+")
+SENTENCE_END = re.compile(r"(?<=[.!?])[*_)\"'”’]*\s+|\n+")  # a full stop may be followed by **, ) or quotes
 LEADING_CITATIONS = re.compile(r"^\s*((?:\[\[[^\[\]]{0,80}\]\]\s*)+)")
-CLAIM = re.compile(
-    r"\b(?:i|we)(?:'ve| have)?\s+(?:sent|paid|scheduled|transferred|submitted|executed|emailed)\b"
-    r"|\b(?:has|have|was|were|is|are)\s+(?:been\s+)?(?:sent|paid|scheduled|transferred|submitted|executed)\b",
+CLAIM = re.compile(  # "I sent …", "the payment has been scheduled"; not "QuickShip has paid on time"
+    r"\b(?:i|we)(?:'ve| have)?\s+(?:just\s+|already\s+)?(?:sent|paid|scheduled|transferred|submitted|executed|emailed)\b"
+    r"|\b(?:payments?|reminders?|emails?|applications?|transfers?|requests?|actions?|it|they)\s+"
+    r"(?:has|have|was|were|is|are)\s+(?:now\s+|already\s+)?(?:been\s+)?"
+    r"(?:sent|paid|scheduled|transferred|submitted|executed)\b",
+    re.IGNORECASE)
+BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s")
+HEADING = re.compile(r"^\s*(?:#{1,6}\s+.*|\*\*[^*]+\*\*:?)\s*$")  # a markdown heading or a bold-only line
+ATTRIBUTION = re.compile(
+    r"\b(?:notes?|says?|said|asks?|asked|asking|claims?|claimed|requests?|requested|tells?|told|instructs?|"
+    r"instructions?|states?|stated|wants?|demands?|wrote|written|mentions?|according to|quotes?|quoted)\b",
     re.IGNORECASE)
 HEDGE = re.compile(r"\b(?:not|no|nothing|never|until|once|after|when|if|unless|awaiting|pending|will|would)\b|n't",
                    re.IGNORECASE)
@@ -52,6 +64,7 @@ def figures_in(text: str) -> list[tuple[Figure, str]]:
 class EvidenceIndex:
     seen: set[str] = field(default_factory=set)
     values: dict[str, set[Figure]] = field(default_factory=dict)
+    quoted: dict[str, set[Figure]] = field(default_factory=dict)  # figures only in untrusted text
     computed: set[str] = field(default_factory=set)
     labels: dict[str, str] = field(default_factory=dict)
 
@@ -67,6 +80,9 @@ class EvidenceIndex:
         figures: set[Figure] = set()
         if isinstance(node, dict):
             if UNTRUSTED_KEY in node:
+                quoted = {f for f, _ in figures_in(str(node[UNTRUSTED_KEY]))}
+                for r in owners:
+                    self.quoted.setdefault(r, set()).update(quoted)
                 return figures
             own = node.get("ref")
             refs = owners
@@ -130,17 +146,27 @@ class CheckResult:
                 "say that anything was sent, paid, scheduled or executed unless a tool result says executed.")
 
 
-def sentences(text: str) -> list[str]:
-    """Split into sentences; citations written just after a full stop belong to the sentence before."""
-    out: list[str] = []
-    for part in SENTENCE_END.split(text):
-        lead = LEADING_CITATIONS.match(part)
-        if lead and out:
-            out[-1] += " " + lead.group(1).strip()
-            part = part[lead.end():]
-        if part.strip():
-            out.append(part.strip())
+def blocks(text: str) -> list[list[str]]:
+    """Lines (paragraphs, bullets) split into sentences. Citations written just after a full stop, or
+    on a line of their own, belong to the sentence before."""
+    out: list[list[str]] = []
+    for line in text.split("\n"):
+        current: list[str] = []
+        for part in SENTENCE_END.split(line):
+            lead = LEADING_CITATIONS.match(part)
+            target = current or (out[-1] if out else None)
+            if lead and target:
+                target[-1] += " " + lead.group(1).strip()
+                part = part[lead.end():]
+            if part.strip():
+                current.append(part.strip())
+        if current:
+            out.append(current)
     return out
+
+
+def sentences(text: str) -> list[str]:
+    return [s for block in blocks(text) for s in block]
 
 
 def _check_ref(raw: str, index: EvidenceIndex, exists: Callable[[str], bool]) -> Citation:
@@ -176,16 +202,33 @@ def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], exe
             citations[raw] = c = _check_ref(raw, index, exists)
             if not c.valid:
                 problems.append(Problem(c.reason or "invalid", f"[[{raw}]] {REASON_TEXT.get(c.reason or '', 'is invalid')}"))
-    for sentence in sentences(text):
-        cited = [citations[r] for r in CITATION.findall(sentence) if citations[r].valid]
-        plain = CITATION.sub(" ", sentence)
-        for figure, written in figures_in(plain):
-            if not CITATION.search(sentence):
-                problems.append(Problem("uncited_figure", f"'{written}' has no citation in its sentence"))
-            elif cited and not any(figure in index.values.get(c.ref, set()) for c in cited):
-                refs = ", ".join(f"[[{c.ref}]]" for c in cited)
-                problems.append(Problem("unsupported_figure", f"'{written}' does not appear in {refs}"))
-        if not executed and CLAIM.search(plain) and not HEDGE.search(plain):
-            problems.append(Problem("claimed_execution",
-                                    f"'{sentence[:80]}' claims an action happened, but no tool result says executed"))
+    all_blocks = blocks(text)
+    intro = ""  # the line introducing the current bulleted list
+    for n, block in enumerate(all_blocks):
+        line = " ".join(block)
+        if not BULLET.match(line):
+            intro = line if line.rstrip().endswith(":") else ""
+        attributed = bool(ATTRIBUTION.search(CITATION.sub(" ", f"{intro} {line}")))
+        block_refs = [r for s in block for r in CITATION.findall(s)]
+        if not block_refs and n + 1 < len(all_blocks) and HEADING.match(" ".join(block)):
+            block_refs = [r for s in all_blocks[n + 1] for r in CITATION.findall(s)]  # a heading: its section
+        for sentence in block:
+            refs = CITATION.findall(sentence) or block_refs  # a citation at the end of the line covers it
+            cited = [citations[r] for r in refs if citations[r].valid]
+            plain = CITATION.sub(" ", sentence)
+            for figure, written in figures_in(plain):
+                if not refs:
+                    problems.append(Problem("uncited_figure", f"'{written}' has no citation in its sentence or line"))
+                elif cited and not any(figure in index.values.get(c.ref, set()) for c in cited):
+                    names = ", ".join(f"[[{c.ref}]]" for c in cited)
+                    if any(figure in index.quoted.get(c.ref, set()) for c in cited):
+                        if not attributed:
+                            problems.append(Problem("unsupported_figure", (
+                                f"'{written}' appears only in document text of {names}; say it is what the "
+                                "document says, not a fact")))
+                    else:
+                        problems.append(Problem("unsupported_figure", f"'{written}' does not appear in {names}"))
+            if not executed and CLAIM.search(plain) and not HEDGE.search(plain):
+                problems.append(Problem("claimed_execution",
+                                        f"'{sentence[:80]}' claims an action happened, but no tool result says executed"))
     return CheckResult(tuple(citations.values()), tuple(problems))

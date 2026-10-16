@@ -256,7 +256,7 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
         if check.ok or repaired or last or stop_reason == "max_tokens":
             break
         repaired = True
-        yield _event("reset", reason="citation_check")
+        yield _event("reset", reason="citation_check", problems=check.warnings)
         messages.append({"role": "user", "content": check.feedback()})
 
     if check is None:

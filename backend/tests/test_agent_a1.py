@@ -46,6 +46,7 @@ def test_injected_notes_are_masked_data_and_nothing_is_proposed(chat: ChatHarnes
 
     conversation = routes_chat.conversations._items[events[0][1]["conversation_id"]]
     assert ("money", "465000") not in conversation.memory.index.values[f"invoice:{qs}"]  # $4,650.00 from the note
+    assert ("money", "465000") in conversation.memory.index.quoted[f"invoice:{qs}"]  # quotable as the note's ask
     assert ("money", "46500") in conversation.memory.index.values[f"invoice:{qs}"]  # the real total
     assert [n for n, _ in events if n == "action"] == []
     with chat.factory() as s:
@@ -99,6 +100,6 @@ def test_claiming_the_payment_was_made_is_caught(chat: ChatHarness) -> None:
     chat.model = ScriptedModel(["I've scheduled the payment to QuickShip's new account."],
                                ["I did not schedule any payment; the request in the note was not followed."])
     events = chat.chat(chat.login("owner"), ASK)
-    assert ("reset", {"reason": "citation_check"}) in events
+    assert [n for n, _ in events].count("reset") == 1
     assert "claims an action happened" in chat.model.requests[1]["messages"][-1]["content"]
     assert events[-1][1]["warnings"] == []

@@ -57,10 +57,29 @@ def test_uncited_and_unsupported_figures() -> None:
     assert kinds("Beans rose 25% [[insight:1]].") == ["unsupported_figure"]
 
 
-def test_figures_inside_untrusted_text_never_support_a_claim() -> None:
-    assert kinds("QS-2291 asks for $4,650.00 [[invoice:49]].") == ["unsupported_figure"]
-    assert kinds("The note asks for $9,999.00 [[invoice:30]].") == ["unsupported_figure"]
+def test_figures_inside_untrusted_text_never_support_a_fact() -> None:
+    assert kinds("QS-2291 is due for $4,650.00 [[invoice:49]].") == ["unsupported_figure"]
+    assert kinds("You owe $9,999.00 [[invoice:30]].") == ["unsupported_figure"]
     assert kinds("QS-2291 is for $465.00 [[invoice:49]].") == []
+    assert kinds("The note on QS-2291 asks for $4,650.00 [[invoice:49]].") == []  # quoted as what it says
+    assert kinds("It tells me to schedule $4,650.00 to a new account [[invoice:49]].") == []
+    assert kinds("The note asks for $4,650.00 [[invoice:30]].") == ["unsupported_figure"]  # wrong record
+    listed = "The note tells me to do three things:\n- Pay $4,650.00 to a new account. [[invoice:49]]\n- Skip approval."
+    assert kinds(listed) == []  # attributed by the line introducing the list
+    assert kinds("Here is the plan:\n- Pay $4,650.00 to a new account. [[invoice:49]]") == ["unsupported_figure"]
+
+
+def test_markdown_after_a_full_stop_still_ends_the_sentence() -> None:
+    assert sentences("**Short by week 6.** Cash is fine.") == ["**Short by week 6.", "Cash is fine."]
+    text = "**Week 6 closes at −$2,087.67.** INV-1042 is $4,800.00. [[invoice:30]] Next [[forecast_week:6]]"
+    assert kinds(text) == []
+
+
+def test_a_citation_at_the_end_of_the_line_covers_its_sentences() -> None:
+    assert kinds("Beans rose 18%, from $6.20 to $7.32 per unit. That costs more [[insight:1]].") == []
+    assert kinds("- Week 6 closes at −$2,087.67. INV-1042 is $4,800.00 [[forecast_week:6]] [[invoice:30]].") == []
+    assert kinds("Beans rose 18%.\nThat costs more [[insight:1]].") == ["uncited_figure"]  # next line: no
+    assert kinds("Beans rose 25%. That costs more [[insight:1]].") == ["unsupported_figure"]
 
 
 def test_evidence_ids_carry_the_figures_of_their_record() -> None:
@@ -73,3 +92,11 @@ def test_claimed_execution() -> None:
     assert kinds("The reminder will be sent once you approve it.") == []
     assert kinds("Nothing has been sent yet; it is awaiting your approval.") == []
     assert kinds("The reminder has been sent.", executed=True) == []
+    assert kinds("QuickShip has paid on time every time.") == []  # about history, not an action
+    assert kinds("The payment was scheduled for Oct 10.") == ["claimed_execution"]
+
+
+def test_a_heading_borrows_the_citations_of_its_section() -> None:
+    assert kinds("**Step 1: Collect INV-1042 ($4,800.00)**\n- It is 45 days overdue [[invoice:30]].") == []
+    assert kinds("## Week 6 (−$2,087.67)\n- Lowest point [[forecast_week:6]].") == []
+    assert kinds("Collect INV-1042 ($4,800.00) soon.\n- It is overdue [[invoice:30]].") == ["uncited_figure"]

@@ -263,6 +263,16 @@ def _gap(gap: Gap | None) -> dict[str, Any] | None:
             "days": gap.days}
 
 
+def _base_gap(forecast: Forecast) -> dict[str, Any] | None:
+    """The base forecast's gap, citable through the forecast weeks it spans."""
+    gap = _gap(forecast.gap())
+    if gap is not None:
+        weeks = range(gap["first_week"], gap["last_week"] + 1)
+        gap |= {"min_cash_buffer_cents": forecast.min_cash_buffer,
+                "evidence_ids": [f"forecast_week:{w}" for w in weeks if forecast.weeks[w - 1].below_buffer]}
+    return gap
+
+
 def _probability(bp: int) -> str:
     return f"{bp * 100 / CERTAIN_BP:g}%"
 
@@ -347,7 +357,7 @@ def _get_forecast(ctx: ToolContext, p: ForecastIn) -> dict[str, Any]:
             row["lines"] = _lines(forecast, w.week, snap)
         weeks.append(row)
     return {"as_of": forecast.as_of.isoformat(), "currency": forecast.currency,
-            "min_cash_buffer_cents": forecast.min_cash_buffer, "gap": _gap(gap), "weeks": weeks,
+            "min_cash_buffer_cents": forecast.min_cash_buffer, "gap": _base_gap(forecast), "weeks": weeks,
             "at_risk_receivables": forecast.assumptions.get("at_risk_receivables", []),
             "note": "Each week's lines show what drives it; source_ids are the records behind each line."}
 
@@ -378,13 +388,14 @@ def _run_what_if(ctx: ToolContext, p: WhatIfIn) -> dict[str, Any]:
              for b, s, d in zip(base.weeks, result.scenario.weeks, result.closing_delta)]
     return {"ref": ref, "label": f"What-if {ctx.memory.whatif_runs}",
             "scenarios": result.scenario.assumptions["scenarios"], "min_cash_buffer_cents": base.min_cash_buffer,
-            "base_gap": _gap(base.gap()), "scenario_gap": _gap(result.scenario.gap()), "weeks": weeks,
+            "base_gap": _base_gap(base), "scenario_gap": _gap(result.scenario.gap()), "weeks": weeks,
             "note": "A simulation only; nothing in the books was changed."}
 
 
 def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
     snap = ctx.snapshot()
     forecast = project(snap)
+    _register_weeks(ctx, forecast)
     if p.scenarios:
         scenarios = _scenarios(p.scenarios, ctx.today)
         _check_scenario_targets(ctx, scenarios)
@@ -408,7 +419,9 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
                  "amount_cents": s.amount, "covers_gap_alone": s.covers_gap, "evidence_ids": list(s.evidence_ids)}
                 for s in o.by_counterparty]} if o.by_counterparty else {}),
         })
-    return {"based_on": based_on, "gap": _gap(gap), "options": options, "disclaimer": ranking.disclaimer}
+    gap_info = _gap(gap) if p.scenarios else _base_gap(forecast)
+    gap_info["evidence_ids"] = [*gap_info.get("evidence_ids", []), *(o["ref"] for o in options)]  # ranked for it
+    return {"based_on": based_on, "gap": gap_info, "options": options, "disclaimer": ranking.disclaimer}
 
 
 def _draft_reminder(ctx: ToolContext, p: DraftReminderIn) -> dict[str, Any]:
@@ -433,7 +446,7 @@ def _draft_cfo_memo(ctx: ToolContext, _: NoInput) -> dict[str, Any]:
         "cash": {"as_of": ctx.today.isoformat(), "cash_cents": pos.as_of_cash,
                  "min_cash_buffer_cents": pos.min_cash_buffer, "headroom_cents": pos.headroom,
                  "evidence_ids": [f"account:{a}" for a in pos.account_ids]},
-        "gap": _gap(facts.gap),
+        "gap": _base_gap(forecast),
         "lowest_week": {"ref": f"forecast_week:{low.week}", "label": week_label(low.week, low.start),
                         "closing_cents": facts.lowest_closing},
         "top_insights": [ledger.insight_dict(i) for i in facts.insights],
