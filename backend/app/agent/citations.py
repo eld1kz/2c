@@ -7,14 +7,21 @@ money amounts and percentages each one carries. `validate` checks the agent's fi
 - each sentence stating money or a percentage cites something (in the sentence, or else anywhere
   in the same line / bullet), and one of those citations carries that exact figure;
 - a figure that only appears in a cited record's untrusted text (e.g. the amount an invoice note
-  asks for) is accepted only when it is attributed to the document ("the note asks for") in the
-  same line, or in the line introducing the list it is in;
-- it does not claim an action was sent/paid/executed unless a tool result said `executed`.
+  asks for) is accepted only when it is explicitly framed as a quote: inside quotation marks, or
+  after "the note says / the invoice text claims …" in the same sentence;
+- it does not claim an action was sent/paid/executed/approved/done unless a tool result in this turn
+  said `executed`.
 Figures inside "untrusted_text" wrappers are kept apart (`quoted`), so a figure in a document can be
-quoted as what the document says but never backs a statement of fact.
+quoted as what the document says but never backs a statement of fact. Values someone supplied
+rather than the engine derived (under a `supplied_input` key: what-if scenario inputs, action params
+and rationales) and a what-if's per-week `change_cents` (which equals the scenario input) are never
+evidence at all.
+Money is recognised as $1,234.56, ＄1,234 (text is NFKC-normalised first), USD 1,234 and
+1,234 dollars; bare numbers such as day or week counts are not checked.
 """
 
 import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -24,27 +31,41 @@ from app.services.ledger import REF_TYPES
 COMPUTED_TYPES = ("forecast_week", "whatif", "financing")
 KNOWN_TYPES = (*REF_TYPES, *COMPUTED_TYPES)
 UNTRUSTED_KEY = "untrusted_text"
+SUPPLIED_KEY = "supplied_input"  # values the model (or a user) chose: shown, never evidence
+NOT_EVIDENCE_KEYS = frozenset({SUPPLIED_KEY, "change_cents", "change_display"})
 
 CITATION = re.compile(r"\[\[([^\[\]]{0,80})\]\]")
 REF = re.compile(r"^([a-z_]+):([A-Za-z0-9_]+)$")
-MONEY = re.compile(r"(?<![\w.,])[−-]?\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d|[.,]\d)")
+_AMOUNT = r"(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d|[.,]\d)"
+MONEY = re.compile(r"(?<![\w.,])[−-]?(?:US\$|USD\s?|\$)\s?" + _AMOUNT)  # $1,234.56 / USD 1,234
+MONEY_WORD = re.compile(r"(?<![\w.,$])[−-]?" + _AMOUNT + r"\s?(?:dollars?|USD)\b", re.IGNORECASE)  # 1,234 dollars
 PERCENT = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s?%")
 SENTENCE_END = re.compile(r"(?<=[.!?])[*_)\"'”’]*\s+|\n+")  # a full stop may be followed by **, ) or quotes
 LEADING_CITATIONS = re.compile(r"^\s*((?:\[\[[^\[\]]{0,80}\]\]\s*)+)")
-CLAIM = re.compile(  # "I sent …", "the payment has been scheduled"; not "QuickShip has paid on time"
-    r"\b(?:i|we)(?:'ve| have)?\s+(?:just\s+|already\s+)?(?:sent|paid|scheduled|transferred|submitted|executed|emailed)\b"
-    r"|\b(?:payments?|reminders?|emails?|applications?|transfers?|requests?|actions?|it|they)\s+"
-    r"(?:has|have|was|were|is|are)\s+(?:now\s+|already\s+)?(?:been\s+)?"
-    r"(?:sent|paid|scheduled|transferred|submitted|executed)\b",
+_DONE = (r"(?:sent|paid|scheduled|transferred|submitted|executed|emailed|approved|completed?|done|processed|"
+         r"wired|settled|delivered|made|initiated|carried out|taken care of)")
+_ACTION = r"(?:payments?|reminders?|emails?|applications?|transfers?|requests?|actions?|wires?|loans?)"
+_ADV = r"(?:(?:now|already|just|successfully|also|fully|finally)\s+)*"
+CLAIM = re.compile(  # past or perfect tense about an action; a negation must sit right next to the verb
+    rf"\b(?:i|we)(?:'ve|'d| have| had)?\s+{_ADV}{_DONE}\b"  # I sent / we've paid / I approved and executed
+    rf"|\b(?:{_ACTION}|it|they|this|that|everything)\b(?:\s+(?!not\b|never\b)[\w'-]+){{0,5}}?\s+"
+    rf"(?:has|have|had|was|were|is|are|got)\s+{_ADV}(?:been\s+{_ADV})?{_DONE}\b"  # the payment … was sent / is complete
+    rf"|(?<!no )(?<!not )\b{_ACTION}\s+(?:sent|went out|executed|approved|completed|done|paid|submitted|delivered|"
+    rf"processed|wired)\b"  # "Payment sent to QuickShip", "the reminder went out"
+    rf"|\b(?!(?:nothing|none|no|not|neither)\b)[\w-]+\s+(?:has|have)\s+{_ADV}been\s+{_ADV}"
+    rf"(?:paid|sent|executed|transferred|wired|approved|submitted|scheduled|settled)\b"  # QuickShip has been paid
+    rf"|\b(?:has gone out|it'?s (?:done|complete|sent|paid))\b"
+    rf"|^\W*done\b",  # "Done: …"
     re.IGNORECASE)
-BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s")
 HEADING = re.compile(r"^\s*(?:#{1,6}\s+.*|\*\*[^*]+\*\*:?)\s*$")  # a markdown heading or a bold-only line
-ATTRIBUTION = re.compile(
-    r"\b(?:notes?|says?|said|asks?|asked|asking|claims?|claimed|requests?|requested|tells?|told|instructs?|"
-    r"instructions?|states?|stated|wants?|demands?|wrote|written|mentions?|according to|quotes?|quoted)\b",
+QUOTE_FRAME = re.compile(  # "the note says", "the invoice text claims", "according to the note"
+    r"\b(?:the|this|that|its|qs-\d+'s|[\w-]+'s)\s+(?:invoice\s+|supplier'?s?\s+)?"
+    r"(?:notes?|memo|invoice text|text|document|description|line description|message|instruction)"
+    r"(?:\s+(?:on|in|of|from|for|attached to)\s+(?:the\s+)?[\w-]+)?\s+"  # "the note on QS-2291 says"
+    r"(?:says?|said|asks?|asked|claims?|claimed|requests?|requested|states?|stated|demands?|demanded|tells?|told|"
+    r"instructs?|instructed|wants?|wanted|reads?)\b|\baccording to the (?:invoice\s+)?(?:notes?|memo|document|text)\b",
     re.IGNORECASE)
-HEDGE = re.compile(r"\b(?:not|no|nothing|never|until|once|after|when|if|unless|awaiting|pending|will|would)\b|n't",
-                   re.IGNORECASE)
+QUOTED_SPAN = re.compile(r"\"[^\"]*\"|“[^”]*”")
 UNVERIFIED_NOTICE = "⚠ Some figures in this answer could not be verified against your records."
 
 Figure = tuple[str, str]  # ("money", "480000") or ("pct", "18")
@@ -54,10 +75,29 @@ def money_cents(whole: str, cents: str | None) -> int:
     return int(whole.replace(",", "")) * 100 + int(cents or 0)
 
 
+def normalize(text: str) -> str:
+    return unicodedata.normalize("NFKC", text)  # ＄ → $, fullwidth digits → ASCII
+
+
+def _figure_matches(text: str) -> list[tuple[Figure, str, int]]:
+    """(figure, as written, position) for every money amount and percentage in normalised `text`."""
+    found = [(("money", str(money_cents(m.group(1), m.group(2)))), m.group(0), m.start()) for m in MONEY.finditer(text)]
+    spans = [range(m.start(), m.end()) for m in MONEY.finditer(text)]
+    found += [(("money", str(money_cents(m.group(1), m.group(2)))), m.group(0), m.start())
+              for m in MONEY_WORD.finditer(text) if not any(m.start() in r for r in spans)]
+    return found + [(("pct", str(float(m.group(1)))), m.group(0), m.start()) for m in PERCENT.finditer(text)]
+
+
 def figures_in(text: str) -> list[tuple[Figure, str]]:
-    """(figure, as written) for every money amount and percentage in `text`."""
-    found = [(("money", str(money_cents(m.group(1), m.group(2)))), m.group(0)) for m in MONEY.finditer(text)]
-    return found + [(("pct", str(float(m.group(1)))), m.group(0)) for m in PERCENT.finditer(text)]
+    return [(f, w) for f, w, _ in _figure_matches(normalize(text))]
+
+
+def framed_as_quote(sentence: str, position: int) -> bool:
+    """Whether the figure at `position` is explicitly quoted: inside quotation marks, or after
+    "the note says …" earlier in the same sentence."""
+    if any(m.start() < position < m.end() for m in QUOTED_SPAN.finditer(sentence)):
+        return True
+    return any(m.end() <= position for m in QUOTE_FRAME.finditer(sentence))
 
 
 @dataclass
@@ -90,6 +130,8 @@ class EvidenceIndex:
                 refs = (*owners, own)
             linked = [r for key in ("evidence_ids", "source_ids") for r in node.get(key) or [] if isinstance(r, str)]
             for key, value in node.items():
+                if key in NOT_EVIDENCE_KEYS:
+                    continue
                 if key.endswith("_cents"):
                     for v in value if isinstance(value, list) else [value]:
                         if isinstance(v, int) and not isinstance(v, bool):
@@ -195,6 +237,7 @@ REASON_TEXT = {
 
 
 def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], executed: bool = False) -> CheckResult:
+    text = normalize(text)
     citations: dict[str, Citation] = {}
     problems: list[Problem] = []
     for raw in CITATION.findall(text):
@@ -203,12 +246,7 @@ def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], exe
             if not c.valid:
                 problems.append(Problem(c.reason or "invalid", f"[[{raw}]] {REASON_TEXT.get(c.reason or '', 'is invalid')}"))
     all_blocks = blocks(text)
-    intro = ""  # the line introducing the current bulleted list
     for n, block in enumerate(all_blocks):
-        line = " ".join(block)
-        if not BULLET.match(line):
-            intro = line if line.rstrip().endswith(":") else ""
-        attributed = bool(ATTRIBUTION.search(CITATION.sub(" ", f"{intro} {line}")))
         block_refs = [r for s in block for r in CITATION.findall(s)]
         if not block_refs and n + 1 < len(all_blocks) and HEADING.match(" ".join(block)):
             block_refs = [r for s in all_blocks[n + 1] for r in CITATION.findall(s)]  # a heading: its section
@@ -216,19 +254,19 @@ def validate(text: str, index: EvidenceIndex, exists: Callable[[str], bool], exe
             refs = CITATION.findall(sentence) or block_refs  # a citation at the end of the line covers it
             cited = [citations[r] for r in refs if citations[r].valid]
             plain = CITATION.sub(" ", sentence)
-            for figure, written in figures_in(plain):
+            for figure, written, position in _figure_matches(plain):
                 if not refs:
                     problems.append(Problem("uncited_figure", f"'{written}' has no citation in its sentence or line"))
                 elif cited and not any(figure in index.values.get(c.ref, set()) for c in cited):
                     names = ", ".join(f"[[{c.ref}]]" for c in cited)
                     if any(figure in index.quoted.get(c.ref, set()) for c in cited):
-                        if not attributed:
+                        if not framed_as_quote(plain, position):
                             problems.append(Problem("unsupported_figure", (
-                                f"'{written}' appears only in document text of {names}; say it is what the "
-                                "document says, not a fact")))
+                                f"'{written}' appears only in document text of {names}; quote it explicitly "
+                                "(\"the note says …\" or in quotation marks), never as a fact")))
                     else:
                         problems.append(Problem("unsupported_figure", f"'{written}' does not appear in {names}"))
-            if not executed and CLAIM.search(plain) and not HEDGE.search(plain):
+            if not executed and CLAIM.search(plain):
                 problems.append(Problem("claimed_execution",
                                         f"'{sentence[:80]}' claims an action happened, but no tool result says executed"))
     return CheckResult(tuple(citations.values()), tuple(problems))

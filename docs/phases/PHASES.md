@@ -64,9 +64,11 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 
 ## Phase 5 — Frontend  *(Oct 17–18)*
 - Pages per SPEC §10, login with demo users, evidence chips, forecast chart with buffer line, mobile-first approvals inbox.
+- **Hard requirement (chat):** streamed `text` deltas are rendered as provisional (visibly marked as drafting); a `reset` event discards everything streamed so far; `done.message` replaces the streamed text and is the only final answer; an `error` event replaces it with the error. Invalid citation chips (`valid: false`) render as "unverified". A false "I've sent $9,999" streamed before the check must never stay on screen.
 
 **Acceptance**
 - Full manual run of P1 on phone-width viewport: insight → chat → draft reminder → approve → sandbox email visible → audit shows chain.
+- Chat: a scripted answer that fails the citation/claim check is visibly replaced after `reset`, and only `done.message` remains on screen.
 - No console errors on any page.
 
 ## Phase 6 — Innovation layer  *(Oct 18)*

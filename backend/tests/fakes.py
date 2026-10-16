@@ -26,7 +26,7 @@ class ScriptedModel:
 
     Each step is a list of blocks, or a function of the message history returning one (to use ids
     from earlier tool results), or an exception to raise. A block is a str (text) or a
-    ("tool_name", {input}) tuple (a tool call). When the script runs out it answers "Done."
+    ("tool_name", {input}) tuple (a tool call). When the script runs out it answers "Okay."
     """
 
     def __init__(self, *steps: object) -> None:
@@ -39,7 +39,7 @@ class ScriptedModel:
 
         self.requests.append(copy.deepcopy({"system": system, "tools": [t["name"] for t in tools],
                                             "messages": messages, "tool_choice": tool_choice}))
-        step = self.steps.pop(0) if self.steps else ["Done."]
+        step = self.steps.pop(0) if self.steps else ["Okay."]
         if isinstance(step, Exception):
             raise step
         blocks = []

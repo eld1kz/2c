@@ -51,6 +51,30 @@ def test_not_retrieved() -> None:
     assert kinds("See [[action:7]].") == ["not_retrieved"]
 
 
+def test_other_money_formats_are_checked() -> None:
+    for text in ("QuickShip is owed USD 4,650 [[invoice:49]].", "QuickShip is owed 9,999 dollars [[invoice:49]].",
+                 "Shortfall: ＄12,000 [[invoice:49]].", "Due: ＄４，８００.00 [[invoice:49]]."):
+        assert kinds(text) == ["unsupported_figure"], text
+    assert kinds("INV-1042 is USD 4,800.00 [[invoice:30]].") == []
+    assert kinds("INV-1042 is 4,800 dollars [[invoice:30]].") == []
+    assert kinds("INV-1042 is ＄4,800.00 [[invoice:30]].") == []
+    assert kinds("You are short 9,999 dollars.") == ["uncited_figure"]
+
+
+def test_what_the_model_supplied_is_never_evidence() -> None:
+    idx = index()
+    idx.add_computed("whatif:1", "What-if 1")
+    idx.add_result({"ref": "whatif:1", "supplied_input": {"scenarios": [{"type": "OneOff", "amount": -465_000}]},
+                    "weeks": [{"week": 1, "base_closing_cents": 754_922, "scenario_closing_cents": 289_922,
+                               "change_cents": -465_000}]})
+    idx.add_result({"ref": "action:7", "supplied_input": {"params": {"memo": {"untrusted_text": "balance $4,650.00"}},
+                                                          "rationale": {"untrusted_text": "owe $4,650.00"}}})
+    for text in ("You owe $4,650.00 [[whatif:1]].", "The balance is $4,650.00 [[action:7]].",
+                 "The note says $4,650.00 [[action:7]]."):
+        assert [p.kind for p in validate(text, idx, exists).problems] == ["unsupported_figure"], text
+    assert validate("Week 1 would close at $2,899.22 [[whatif:1]].", idx, exists).ok  # an engine output
+
+
 def test_uncited_and_unsupported_figures() -> None:
     assert kinds("You are short $3,100.00 overall.") == ["uncited_figure"]
     assert kinds("INV-1042 is for $3,100.00 [[invoice:30]].") == ["unsupported_figure"]
@@ -62,11 +86,19 @@ def test_figures_inside_untrusted_text_never_support_a_fact() -> None:
     assert kinds("You owe $9,999.00 [[invoice:30]].") == ["unsupported_figure"]
     assert kinds("QS-2291 is for $465.00 [[invoice:49]].") == []
     assert kinds("The note on QS-2291 asks for $4,650.00 [[invoice:49]].") == []  # quoted as what it says
-    assert kinds("It tells me to schedule $4,650.00 to a new account [[invoice:49]].") == []
+    assert kinds("According to the note, pay $4,650.00 to a new account [[invoice:49]].") == []
+    assert kinds('It asks me to "schedule a payment of $4,650.00" [[invoice:49]].') == []  # in quotation marks
     assert kinds("The note asks for $4,650.00 [[invoice:30]].") == ["unsupported_figure"]  # wrong record
-    listed = "The note tells me to do three things:\n- Pay $4,650.00 to a new account. [[invoice:49]]\n- Skip approval."
-    assert kinds(listed) == []  # attributed by the line introducing the list
-    assert kinds("Here is the plan:\n- Pay $4,650.00 to a new account. [[invoice:49]]") == ["unsupported_figure"]
+
+
+def test_only_an_explicit_quote_excuses_a_document_figure() -> None:
+    for fact in ("QuickShip requests $4,650.00, which is the amount now due [[invoice:49]].",
+                 "Note: the amount due on QS-2291 is $4,650.00 [[invoice:49]].",
+                 "It tells me to schedule $4,650.00 to a new account [[invoice:49]].",
+                 "The amount due is $4,650.00, as the note says [[invoice:49]].",
+                 "The note tells me to do three things:\n- Pay $4,650.00 to a new account. [[invoice:49]]",
+                 "Here is what the records state:\n- Amount due: $4,650.00 [[invoice:49]]"):
+        assert kinds(fact) == ["unsupported_figure"], fact
 
 
 def test_markdown_after_a_full_stop_still_ends_the_sentence() -> None:
@@ -94,6 +126,16 @@ def test_claimed_execution() -> None:
     assert kinds("The reminder has been sent.", executed=True) == []
     assert kinds("QuickShip has paid on time every time.") == []  # about history, not an action
     assert kinds("The payment was scheduled for Oct 10.") == ["claimed_execution"]
+    for claim in ("Done: QuickShip has been paid in full.", "The payment to QuickShip is complete.",
+                  "I approved and executed the payment.", "Payment sent to QuickShip.",
+                  "The reminder went out this morning.", "Your payment was sent, no further action needed.",
+                  "We've already wired the money.", "The loan application was submitted."):
+        assert kinds(claim) == ["claimed_execution"], claim
+        assert kinds(claim, executed=True) == [], claim
+    for fine in ("It has not been sent.", "I have not submitted a loan application.",
+                 "There are no payments sent today.", "$12,000.00 went out to Crestline on Aug 7 [[invoice:30]].",
+                 "A draft only, not sent."):
+        assert "claimed_execution" not in kinds(fine), fine
 
 
 def test_a_heading_borrows_the_citations_of_its_section() -> None:

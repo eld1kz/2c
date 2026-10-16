@@ -13,9 +13,10 @@ so the model copies figures and never formats or computes them (T7). Third-party
 import hashlib
 import json
 import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -66,6 +67,9 @@ from app.services.ledger import UntrustedText
 MAX_UNTRUSTED_CHARS = 600
 MAX_RATIONALE_CHARS = 500
 MAX_EVIDENCE_IDS = 20
+MAX_PROPOSALS_PER_TURN = 3
+MAX_SCENARIO_CENTS = 100_000_000  # $1,000,000
+MAX_SCENARIO_DAYS = 91  # 13 weeks: the forecast horizon
 INSTRUCTION_LIKE = re.compile(
     r"ignore (?:all |any )?(?:previous|prior|above)|system (?:notice|prompt|message)|\bai assistant\b|"
     r"pre-?approved|do not ask|chang(?:e|ed) (?:of )?bank|new (?:bank|account)|beneficiary|wire|"
@@ -98,6 +102,7 @@ class ToolContext:
     today: date  # DEMO_TODAY
     service: ActionService
     memory: AgentMemory
+    proposals: int = 0  # EXECUTE proposals made in this turn
 
     def snapshot(self) -> Snapshot:
         return load_snapshot(self.session, self.business.id, self.today)
@@ -160,19 +165,21 @@ class CollectIn(_In):
 class DelayIn(_In):
     type: Literal["delay_receivable"]
     invoice_id: int
-    days: int = Field(ge=1, le=90)
+    days: int = Field(ge=1, le=MAX_SCENARIO_DAYS)
 
 
 class AddRecurringIn(_In):
     type: Literal["add_recurring"]
-    amount_cents: int = Field(description="signed cents per occurrence: negative = cost, positive = income")
+    amount_cents: int = Field(description="signed cents per occurrence: negative = cost, positive = income; "
+                                          "at most $1,000,000 either way")
     cadence: Cadence
     start: date
 
 
 class OneOffIn(_In):
     type: Literal["one_off"]
-    amount_cents: int = Field(description="signed cents: negative = payment out, positive = money in")
+    amount_cents: int = Field(description="signed cents: negative = payment out, positive = money in; "
+                                          "at most $1,000,000 either way")
     on: date
 
 
@@ -224,9 +231,15 @@ class SubmitLoanApplicationIn(SubmitLoanApplicationParams, _Proposal):
 # --- result helpers ------------------------------------------------------------------------
 
 
+def strip_invisible(text: str) -> str:
+    """Remove zero-width and bidi control characters (Unicode category Cf) so hidden text cannot
+    split words past the checks or reorder what the model reads."""
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+
+
 def untrusted(text: str, source: str) -> dict[str, Any]:
     """Wrap third-party text as data: cleaned, cut short, unable to forge citations or PII tokens."""
-    clean = CONTROL.sub(" ", strip_token_marks(text)).replace("[[", "[ [").replace("]]", "] ]")
+    clean = CONTROL.sub(" ", strip_token_marks(strip_invisible(text))).replace("[[", "[ [").replace("]]", "] ]")
     clean = " ".join(clean.split())[:MAX_UNTRUSTED_CHARS]
     return {"untrusted_text": clean, "source": source, "instruction_like": bool(INSTRUCTION_LIKE.search(clean))}
 
@@ -300,7 +313,14 @@ def _scenarios(items: list[Any], today: date) -> list[Scenario]:
 
 
 def _check_scenario_targets(ctx: ToolContext, scenarios: list[Scenario]) -> None:
+    last = ctx.today + timedelta(days=MAX_SCENARIO_DAYS)
     for s in scenarios:
+        on = getattr(s, "on", None) or getattr(s, "start", None)
+        if on is not None and not ctx.today <= on <= last:
+            raise ScenarioError(f"scenario dates must be between {ctx.today} and {last}")
+        if isinstance(s, (AddRecurring, OneOff)) and not 0 < abs(s.amount) <= MAX_SCENARIO_CENTS:
+            raise ScenarioError(f"scenario amounts must be non-zero and at most "
+                                f"{money(MAX_SCENARIO_CENTS, ctx.business.base_currency)} either way")
         if isinstance(s, (CollectReceivable, DelayReceivable)):
             ref = f"invoice:{s.invoice_id}"
         elif isinstance(s, RemoveSeries):
@@ -387,7 +407,8 @@ def _run_what_if(ctx: ToolContext, p: WhatIfIn) -> dict[str, Any]:
               "scenario_closing_cents": s.closing, "change_cents": d, "below_buffer": s.below_buffer}
              for b, s, d in zip(base.weeks, result.scenario.weeks, result.closing_delta)]
     return {"ref": ref, "label": f"What-if {ctx.memory.whatif_runs}",
-            "scenarios": result.scenario.assumptions["scenarios"], "min_cash_buffer_cents": base.min_cash_buffer,
+            "supplied_input": {"scenarios": result.scenario.assumptions["scenarios"]},
+            "min_cash_buffer_cents": base.min_cash_buffer,
             "base_gap": _base_gap(base), "scenario_gap": _gap(result.scenario.gap()), "weeks": weeks,
             "note": "A simulation only; nothing in the books was changed."}
 
@@ -594,11 +615,14 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
             raise ToolInputError(f"unknown tool {name!r}")
         if not isinstance(tool_input, dict):
             raise ToolInputError("tool input must be a JSON object")
+        if not can_propose(ctx.user.role, spec.tier, name):  # before anything is proposed or stored
+            raise ToolInputError(f"{name} is not available to the {ctx.user.role.value} role")
         if spec.handler is None:
+            if ctx.proposals >= MAX_PROPOSALS_PER_TURN:
+                raise ToolInputError(f"at most {MAX_PROPOSALS_PER_TURN} proposals per turn; ask the user first")
+            ctx.proposals += 1
             data, action = _propose(ctx, name, tool_input)
         else:
-            if not can_propose(ctx.user.role, spec.tier, name):
-                raise ToolInputError(f"{name} is not available to the {ctx.user.role.value} role")
             data = spec.handler(ctx, spec.input_model.model_validate(tool_input))
     except ValidationError as e:
         problems = "; ".join(f"{'.'.join(map(str, err['loc'])) or 'input'}: {err['msg']}" for err in e.errors())

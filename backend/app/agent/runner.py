@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.agent.citations import UNVERIFIED_NOTICE, CheckResult, validate
 from app.agent.pii import strip_token_marks
 from app.agent.prompts import render_system
-from app.agent.tools import AgentMemory, ToolContext, dispatch, tools_for
+from app.agent.tools import AgentMemory, ToolContext, dispatch, strip_invisible, tools_for
 from app.audit import log as audit
 from app.db.models import Business, User
 from app.services.action_service import ActionService, actor_for, utc_now
@@ -33,6 +33,8 @@ MAX_TOKENS = 4096
 MAX_TURNS = 30
 CONVERSATION_TTL = timedelta(hours=2)
 MAX_CONVERSATIONS = 200
+MAX_CONVERSATIONS_PER_USER = 20
+MAX_AUDITED_MESSAGE_CHARS = 500
 UNAVAILABLE = ("The assistant is unavailable right now. Anything already proposed is still in the approvals "
                "inbox.")
 STEP_LIMIT = "I stopped after the maximum number of steps for one question; ask me to continue if needed."
@@ -135,7 +137,10 @@ class ConversationStore:
                 if conv.turns >= MAX_TURNS:
                     raise ConversationFull(conversation_id)
             else:
-                if len(self._items) >= MAX_CONVERSATIONS:
+                mine = [k for k, c in self._items.items() if c.user_id == user_id]
+                if len(mine) >= MAX_CONVERSATIONS_PER_USER:  # a user only ever evicts their own
+                    del self._items[min(mine, key=lambda k: self._items[k].last_used)]
+                elif len(self._items) >= MAX_CONVERSATIONS:
                     del self._items[min(self._items, key=lambda k: self._items[k].last_used)]
                 new_id = str(uuid.uuid4())
                 conv = self._items[new_id] = Conversation(new_id, user_id, AgentMemory(new_id))
@@ -179,13 +184,15 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
     ctx = ToolContext(session, user, business, today, service, memory)
     conversation.turns += 1
     base = {"business_id": business.id, "conversation_id": conversation.id}
+    masked = memory.vault.mask_text(strip_token_marks(strip_invisible(user_text)))
     audit.append(session, actor_for(user).label, "agent_turn_started",
-                 {**base, "turn": conversation.turns, "chars": len(user_text)}, now=clock())
+                 {**base, "turn": conversation.turns, "chars": len(user_text),
+                  "message": masked[:MAX_AUDITED_MESSAGE_CHARS]}, now=clock())
     session.commit()
     yield _event("turn", conversation_id=conversation.id, turn=conversation.turns)
 
     messages = conversation.messages
-    messages.append({"role": "user", "content": memory.vault.mask_text(strip_token_marks(user_text))})
+    messages.append({"role": "user", "content": masked})
     system = render_system(business, user.role, today)
     tools = [spec.definition() for spec in tools_for(user)]
     exists = lambda ref: record_exists(session, business.id, ref)  # noqa: E731

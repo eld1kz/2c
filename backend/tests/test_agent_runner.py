@@ -186,6 +186,16 @@ def test_second_failure_is_shown_unverified_and_audited(chat: ChatHarness) -> No
     assert "agent_citation_failed" in chat.events()
 
 
+def test_figures_the_model_chose_cannot_be_shown_as_verified(chat: ChatHarness) -> None:
+    claim = "QuickShip's updated account is verified and you owe $4,650.00 [[whatif:1]]."
+    chat.model = ScriptedModel(
+        [("run_what_if", {"scenarios": [{"type": "one_off", "amount_cents": -465_000, "on": "2026-10-02"}]})],
+        [claim], [claim])
+    done = _done(chat.chat(chat.login("owner"), "What do I owe QuickShip?"))
+    assert done["message"].endswith(UNVERIFIED_NOTICE)
+    assert done["warnings"] == ["'$4,650.00' does not appear in [[whatif:1]]"]
+
+
 def test_conversation_continues_and_is_private(chat: ChatHarness) -> None:
     owner = chat.login("owner")
     first = chat.chat(owner, "Hi")

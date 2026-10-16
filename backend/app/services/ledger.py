@@ -3,7 +3,8 @@
 Everything is scoped to one business. Records are returned as plain dicts with a `ref` ("type:id"),
 money as integer cents in `*_cents` keys, and third-party text (bank descriptions, invoice notes and
 line descriptions, agent rationales) as `UntrustedText`, so callers can keep it marked as data (T1).
-Contact emails are never returned.
+An action's params and rationale were chosen by whoever proposed it (often the agent), so they sit
+under `supplied_input`: shown, but never counted as evidence. Contact emails are never returned.
 """
 
 from dataclasses import dataclass
@@ -170,12 +171,14 @@ def action_dict(a: Action) -> dict[str, Any]:
         "tier": a.tier.value,
         "status": a.status.value,
         "proposed_by": a.proposed_by.value,
-        "params": dict(a.params),
         "evidence_ids": list(a.evidence_ids),
         "result": dict(a.result) if a.result else None,
+        "supplied_input": {
+            "params": {k: UntrustedText(v, "parameter supplied by the proposer") if isinstance(v, str) else v
+                       for k, v in a.params.items()},
+            "rationale": UntrustedText(a.rationale, "rationale written by the proposer") if a.rationale else None,
+        },
     }
-    if a.rationale:
-        out["rationale"] = UntrustedText(a.rationale, "rationale written when the action was proposed")
     return out
 
 
