@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOutIcon } from "lucide-react";
+import { EllipsisIcon, LogOutIcon } from "lucide-react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/money";
 
 import { EvidenceProvider } from "@/components/evidence/evidence-provider";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { BudgetMeter } from "./budget-meter";
 import { NAV, type NavItem } from "./nav-items";
@@ -76,6 +78,34 @@ function Wordmark() {
   );
 }
 
+function MoreMenu() {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const active = NAV.some((item) => item.more && pathname.startsWith(item.href));
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <button
+        onClick={() => setOpen(true)}
+        className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]", active ? "font-semibold text-ink" : "text-ink-2")}
+      >
+        <EllipsisIcon className={cn("size-[18px]", active && "text-brand")} />
+        More
+      </button>
+      <SheetContent title="More">
+        <nav className="-mx-2 flex flex-col gap-0.5" aria-label="More" onClick={() => setOpen(false)}>
+          {NAV.filter((item) => item.more).map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+          <button onClick={signOut} className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink-2 hover:bg-sunken">
+            <LogOutIcon className="size-[18px]" />
+            Sign out
+          </button>
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
   return (
@@ -124,9 +154,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
-          {NAV.map((item) => (
+          {NAV.filter((item) => !item.more).map((item) => (
             <NavLink key={item.href} item={item} compact />
           ))}
+          <MoreMenu />
         </nav>
       </div>
     </EvidenceProvider>

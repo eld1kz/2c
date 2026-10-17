@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { useEvidence } from "@/components/evidence/evidence-provider";
@@ -99,9 +100,16 @@ export function DashboardView() {
       </section>
 
       <section className="lg:col-start-1" aria-labelledby="insights-title">
-        <h2 id="insights-title" className="text-[15px] font-semibold">
-          What needs attention
-        </h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="insights-title" className="text-[15px] font-semibold">
+            What needs attention
+          </h2>
+          {insights.data && insights.data.length > TOP_INSIGHTS && (
+            <Link href="/insights" className="text-sm font-medium text-brand-ink hover:underline">
+              See all {insights.data.length} insights
+            </Link>
+          )}
+        </div>
         <div className="mt-1 divide-y divide-line border-t border-line">
           {insights.data
             ? insights.data.slice(0, TOP_INSIGHTS).map((i) => <InsightCard key={i.id} insight={i} action={<AskLink question={askAbout(i)} />} />)

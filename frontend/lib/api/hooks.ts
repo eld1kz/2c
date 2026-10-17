@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, unwrap } from "./client";
+import { api, type Schemas, unwrap } from "./client";
 
 export const keys = {
   me: ["me"],
@@ -74,4 +74,28 @@ export function useDecide() {
       }
     },
   });
+}
+
+const AUDIT_PAGE = 500;
+const AUDIT_MAX_PAGES = 20;
+
+/** Every audit event of this business, newest first (the API pages oldest-first by seq). */
+export const useAuditEvents = () =>
+  useQuery({
+    queryKey: ["audit"],
+    queryFn: async () => {
+      const all: Schemas["AuditEventOut"][] = [];
+      let after = 0;
+      for (let page = 0; page < AUDIT_MAX_PAGES; page++) {
+        const rows = unwrap(await api.GET("/audit", { params: { query: { after_seq: after, limit: AUDIT_PAGE } } }));
+        all.push(...rows);
+        if (rows.length < AUDIT_PAGE) break;
+        after = rows[rows.length - 1].seq;
+      }
+      return all.reverse();
+    },
+  });
+
+export function useVerifyChain() {
+  return useMutation({ mutationFn: async () => unwrap(await api.GET("/audit/verify")) });
 }

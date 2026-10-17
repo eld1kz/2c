@@ -12,6 +12,8 @@ const ALLOWED: Record<"GET" | "POST", RegExp[]> = {
     /^actions$/,
     /^records$/,
     /^records\/[a-z_]{1,30}:\d{1,12}$/,
+    /^audit$/,
+    /^audit\/verify$/,
   ],
   POST: [/^chat$/, /^actions\/\d{1,12}\/(approve|reject)$/],
 };
