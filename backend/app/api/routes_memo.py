@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.runner import ChatModel
 from app.api import routes_chat
-from app.api.deps import current_user, get_chat_model, get_session
+from app.api.deps import Principal, current_principal, current_user, get_chat_model, get_session
 from app.api.schemas import CitationOut, MemoBody, MemoOut
 from app.audit import log as audit
 from app.config import Settings, get_settings
@@ -40,20 +40,21 @@ def get_memo(user: User = Depends(current_user), session: Session = Depends(get_
 
 
 @router.post("/memo", response_model=MemoOut)
-def generate_memo(user: User = Depends(current_user), session: Session = Depends(get_session),
+def generate_memo(principal: Principal = Depends(current_principal), session: Session = Depends(get_session),
                   settings: Settings = Depends(get_settings), model: ChatModel = Depends(get_chat_model)) -> MemoOut:
+    user, owner = principal.user, routes_chat.chat_owner(principal, settings)
     if user.role not in MEMO_ROLES:
         audit.append(session, actor_for(user).label, "memo_forbidden",
                      {"business_id": user.business_id, "role": user.role.value}, now=utc_now())
         session.commit()
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"role {user.role.value} may not generate the memo")
-    budget = routes_chat.admit(session, user, settings)
+    budget = routes_chat.admit(session, user, settings, owner)
     try:
         result = cfo_memo.generate(session, user, model, settings.demo_today, budget)
     except MemoUnavailable as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from None
     finally:
-        routes_chat.conversations.end(user.id)
+        routes_chat.conversations.end(owner)
     if result.memo is not None:
         return MemoOut(memo=_body(session, result.memo), stale=False)
     return MemoOut(memo=MemoBody(message=result.message, citations=[CitationOut(**c) for c in result.citations],

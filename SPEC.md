@@ -56,10 +56,10 @@ Real bank connections, real money, tax filing, payroll, multi-company, Telegram/
 |---|---|
 | Frontend | Next.js (App Router, TypeScript), Tailwind, shadcn/ui, Recharts |
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2, Alembic, Pydantic v2 |
-| DB | Postgres (Supabase in prod, Docker Postgres locally) |
+| DB | Postgres (Docker Postgres, locally and in prod) |
 | LLM | Anthropic Claude API via official Python SDK; model from env `LLM_MODEL` |
 | Tests | pytest (backend), Playwright smoke test (frontend, optional) |
-| Deploy | Frontend → Vercel; Backend → Render/Railway/Fly; DB → Supabase |
+| Deploy | One VPS in Singapore (Alibaba Cloud International; fallback Vultr/DigitalOcean Singapore), Docker Compose: Caddy (TLS) → Next.js → FastAPI → Postgres, custom domain. Chosen for reviewers in mainland China: `*.vercel.app` is blocked there, Hong Kong is not an Anthropic API region, and mainland hosting needs an ICP filing (`deploy/`, README → Deploy) |
 
 Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so forecasts, overdue days and tests are reproducible.
 

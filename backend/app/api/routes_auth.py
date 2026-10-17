@@ -2,7 +2,9 @@
 
 Every attempt is audited. Failed attempts are keyed by an HMAC of the email (not reversible without
 the server secret); 5 failures for one email within 15 minutes lock that email out with 429 until
-the window has passed, whatever password is tried.
+the window has passed, whatever password is tried. In production the seeded demo accounts are
+exempt from the lockout: their password is published, so it protects nothing there and would only
+let anyone lock every visitor out (failures are still audited; Caddy rate-limits sign-ins per IP).
 """
 
 import hashlib
@@ -20,10 +22,12 @@ from app.auth.jwt import issue_token, verify_password
 from app.config import Settings, get_settings
 from app.db.models import AuditEvent, User
 from app.services.action_service import utc_now
+from seed.load import DEMO_USERS
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 LOCKOUT_FAILURES = 5
 LOCKOUT_WINDOW = timedelta(minutes=15)
+DEMO_EMAILS = frozenset(email for email, _, _ in DEMO_USERS)
 
 
 def email_key(email: str, secret: str) -> str:
@@ -40,7 +44,8 @@ def login(body: LoginIn, session: Session = Depends(get_session), settings: Sett
     email = body.email.strip().lower()
     key = email_key(email, settings.jwt_secret)
     now = utc_now()
-    if _recent_failures(session, key, now - LOCKOUT_WINDOW) >= LOCKOUT_FAILURES:
+    lockable = not (settings.is_production and email in DEMO_EMAILS)
+    if lockable and _recent_failures(session, key, now - LOCKOUT_WINDOW) >= LOCKOUT_FAILURES:
         audit.append(session, "anonymous", "login_locked", {"email_key": key}, now=now)
         session.commit()
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many failed attempts; try again later",

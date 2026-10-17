@@ -1,0 +1,10 @@
+# Installed as /etc/cron.d/ledgerwise by scripts/deploy.sh. Times are the server's (UTC).
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+COMPOSE="docker compose -f /opt/ledgerwise/deploy/docker-compose.prod.yml"
+
+# Demo reset every 3 hours: golden data back, audit log kept, `demo_reset` event by scheduler:demo_reset.
+0 */3 * * * root $COMPOSE exec -T backend python -m seed.reset --scheduled >> /var/log/ledgerwise-reset.log 2>&1
+
+# Nightly database backup, one per weekday (7 kept).
+30 2 * * * root $COMPOSE exec -T db pg_dump -U ledgerwise ledgerwise | gzip > /var/backups/ledgerwise-$(date +\%a).sql.gz

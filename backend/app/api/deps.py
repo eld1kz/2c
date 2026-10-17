@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import lru_cache
 
 from fastapi import Depends, HTTPException, status
@@ -30,22 +31,33 @@ def get_session() -> Iterator[Session]:
             raise
 
 
-def current_user(
+@dataclass(frozen=True)
+class Principal:
+    user: User
+    session_id: str  # the token's `sid`: one per sign-in
+
+
+def current_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
-) -> User:
+) -> Principal:
     unauthorized = HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated",
                                  headers={"WWW-Authenticate": "Bearer"})
     if credentials is None:
         raise unauthorized
     try:
-        user = session.get(User, read_token(credentials.credentials, settings.jwt_secret))
+        claims = read_token(credentials.credentials, settings.jwt_secret)
     except InvalidToken:
         raise unauthorized from None
+    user = session.get(User, claims.user_id)
     if user is None:
         raise unauthorized
-    return user
+    return Principal(user, claims.session_id)
+
+
+def current_user(principal: Principal = Depends(current_principal)) -> User:
+    return principal.user
 
 
 def action_service(session: Session = Depends(get_session), settings: Settings = Depends(get_settings)) -> ActionService:

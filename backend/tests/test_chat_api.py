@@ -108,7 +108,7 @@ def test_a_user_only_evicts_their_own_conversations(chat: ChatHarness) -> None:
     store = routes_chat.conversations
     other = store.open(99, None)
     mine = [store.open(1, None).id for _ in range(MAX_CONVERSATIONS_PER_USER + 5)]
-    assert other.id in store._items and sum(c.user_id == 1 for c in store._items.values()) == MAX_CONVERSATIONS_PER_USER
+    assert other.id in store._items and sum(c.owner == 1 for c in store._items.values()) == MAX_CONVERSATIONS_PER_USER
     assert mine[0] not in store._items and mine[-1] in store._items
 
 

@@ -1,10 +1,12 @@
 """Demo reset (pulled forward from Phase 7): owner-only, restores the golden state, never deletes or
 rewrites audit events, and the chain still verifies."""
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
+from app.audit.verify import verify_chain
 from app.config import get_settings
 from app.db.models import Action, AuditEvent, Insight, Invoice, SandboxEmail, Transaction, User
 from app.services.action_service import ActionService, actor_for
@@ -99,3 +101,17 @@ def test_conversations_from_before_the_reset_are_gone(chat: ChatHarness) -> None
     gone = chat.chat(owner, "Still there?", conversation_id=conversation_id, expect=404)
     assert gone[0][1]["detail"] == "conversation not found"
     assert chat.chat(owner, "Hi again")[-1][0] == "done"  # a new conversation works
+
+
+@pytest.mark.parametrize(("argv", "actor"), [([], "cli:demo_reset"), (["--scheduled"], "scheduler:demo_reset")])
+def test_reset_command_audits_who_ran_it_and_keeps_the_chain(db: sessionmaker, monkeypatch: pytest.MonkeyPatch,  # noqa: F811
+                                                             argv: list[str], actor: str) -> None:
+    import app.db.session
+    from seed import reset
+
+    monkeypatch.setattr(app.db.session, "SessionLocal", db)
+    reset.main(argv)
+    with db() as s:
+        last = s.scalar(select(AuditEvent).order_by(AuditEvent.seq.desc()))
+        assert (last.event_type, last.actor) == ("demo_reset", actor)
+        assert verify_chain(s).ok

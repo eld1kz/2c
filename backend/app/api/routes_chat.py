@@ -1,5 +1,8 @@
 """POST /chat: one agent turn, streamed as server-sent events. Any signed-in role (tools are filtered
-by role). Rate limited per user (T10): 10 turns a minute, 100 a day, one turn in flight at a time.
+by role). Rate limited per user (T10): 10 turns a minute, 100 a day (300 in production, where judges
+share the demo logins), one turn in flight at a time. In production the in-flight lock and the
+conversations belong to the sign-in session instead of the user (`chat_owner`), so people signed in
+to the same demo account neither block each other nor can continue each other's conversations.
 
 Limits count the `agent_turn_started` audit events, like the login lockout, so they survive restarts
 and hold across workers. The daily AI budget (DAILY_LLM_BUDGET_USD) is checked here and again before
@@ -11,7 +14,7 @@ in full, then one summary event, so a flood cannot grow the audit log without bo
 """
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Hashable, Iterator
 from datetime import timedelta
 from typing import Any, NoReturn
 
@@ -22,7 +25,7 @@ from starlette.types import Receive, Scope, Send
 from sqlalchemy.orm import Session
 
 from app.agent.runner import ChatModel, ConversationFull, ConversationNotFound, ConversationStore, run_turn
-from app.api.deps import current_user, get_chat_model, get_session, get_session_factory
+from app.api.deps import Principal, current_principal, get_chat_model, get_session, get_session_factory
 from app.api.schemas import ChatIn
 from app.audit import log as audit
 from app.config import Settings, get_settings
@@ -33,7 +36,9 @@ from app.services.llm_budget import LlmBudget, to_microusd
 
 router = APIRouter(tags=["chat"])
 conversations = ConversationStore()
-LIMITS = ((timedelta(minutes=1), 10), (timedelta(days=1), 100))
+TURNS_PER_MINUTE = 10
+TURNS_PER_DAY = 100
+TURNS_PER_DAY_PRODUCTION = 300  # the public demo shares three logins between all visitors
 CHAT_ROLES = (Role.owner, Role.accountant, Role.viewer)  # viewers chat with READ tools only
 REFUSAL_EVENTS = ("chat_rate_limited", "chat_refused", "chat_budget_exhausted")
 REFUSAL_AUDITS_PER_WINDOW = 5
@@ -81,14 +86,24 @@ def _sse(event: dict[str, Any]) -> str:
     return f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
 
 
-def admit(session: Session, user: User, settings: Settings) -> LlmBudget:
+def limits(settings: Settings) -> tuple[tuple[timedelta, int], ...]:
+    per_day = TURNS_PER_DAY_PRODUCTION if settings.is_production else TURNS_PER_DAY
+    return (timedelta(minutes=1), TURNS_PER_MINUTE), (timedelta(days=1), per_day)
+
+
+def chat_owner(principal: Principal, settings: Settings) -> Hashable:
+    """Who holds the in-flight lock and the conversations: the user, or in production the sign-in."""
+    return (principal.user.id, principal.session_id) if settings.is_production else principal.user.id
+
+
+def admit(session: Session, user: User, settings: Settings, owner: Hashable) -> LlmBudget:
     """Every check before an agent turn (chat or CFO memo): role, rate limits, the daily AI budget and
-    one turn in flight per user. Refusals are audited and raised; on success the caller must release
-    the lock with `conversations.end(user.id)`."""
+    one turn in flight per `owner` (see chat_owner). Refusals are audited and raised; on success the
+    caller must release the lock with `conversations.end(owner)`."""
     if user.role not in CHAT_ROLES:
         _refuse(session, user, 403, f"role {user.role.value} may not use the assistant")
     now = utc_now()
-    for window, limit in LIMITS:
+    for window, limit in limits(settings):
         if _count(session, f"user:{user.id}", ("agent_turn_started",), now - window) >= limit:
             _refuse(session, user, 429, f"chat limit reached ({limit} per {window})",
                     {"Retry-After": str(int(window.total_seconds()))})
@@ -96,21 +111,22 @@ def admit(session: Session, user: User, settings: Settings) -> LlmBudget:
     if budget.exhausted():
         _refuse(session, user, 503, budget.message(), {"Retry-After": str(budget.seconds_until_reset())},
                 event="chat_budget_exhausted")
-    if not conversations.begin(user.id):
+    if not conversations.begin(owner):
         _refuse(session, user, 429, "a reply is still streaming", {"Retry-After": "5"})
     return budget
 
 
 @router.post("/chat")
-def chat(body: ChatIn, user: User = Depends(current_user), session: Session = Depends(get_session),
+def chat(body: ChatIn, principal: Principal = Depends(current_principal), session: Session = Depends(get_session),
          settings: Settings = Depends(get_settings), model: ChatModel = Depends(get_chat_model),
          session_factory: Callable[[], Session] = Depends(get_session_factory)) -> StreamingResponse:
-    budget = admit(session, user, settings)
+    user, owner = principal.user, chat_owner(principal, settings)
+    budget = admit(session, user, settings, owner)
     limit = budget.limit
     user_id, message, today = user.id, body.message, settings.demo_today
-    release = lambda: conversations.end(user_id)  # noqa: E731 - idempotent
+    release = lambda: conversations.end(owner)  # noqa: E731 - idempotent
     try:
-        conversation = conversations.open(user.id, body.conversation_id,
+        conversation = conversations.open(owner, body.conversation_id,
                                           not_before=last_reset(session, user.business_id))
     except ConversationNotFound:
         release()

@@ -6,12 +6,15 @@ from pydantic import BaseModel
 
 from app.api import (routes_actions, routes_audit, routes_auth, routes_chat, routes_dashboard, routes_demo,
                      routes_memo, routes_records, routes_transactions, routes_upload, routes_whatif)
-from app.config import check_jwt_secret, get_settings
+from app.config import check_jwt_secret, check_production, get_settings
 
 settings = get_settings()
 check_jwt_secret(settings)
+check_production(settings)
 
-app = FastAPI(title="Ledgerwise")
+# No interactive docs or schema in production (the backend is not public there anyway).
+docs = {"docs_url": None, "redoc_url": None, "openapi_url": None} if settings.is_production else {}
+app = FastAPI(title="Ledgerwise", **docs)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],

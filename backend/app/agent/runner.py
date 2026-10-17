@@ -13,7 +13,7 @@ history, so it cannot forge tool results.
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Hashable, Iterator
 from dataclasses import asdict, astuple, dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Protocol
@@ -140,7 +140,7 @@ class AnthropicChatModel:
 @dataclass
 class Conversation:
     id: str
-    user_id: int
+    owner: Hashable  # who may continue it: a user id, or a user's sign-in session in production
     memory: AgentMemory
     messages: list[dict[str, Any]] = field(default_factory=list)
     turns: int = 0
@@ -157,48 +157,51 @@ class ConversationFull(Exception):
 
 
 class ConversationStore:
-    """In-memory, per user, expiring. Also tracks which users have a turn in flight (one at a time)."""
+    """In-memory, per owner, expiring. Also tracks which owners have a turn in flight (one at a time).
+
+    The owner is a user id, or in production a user's sign-in session (routes_chat.chat_owner), so
+    people sharing a demo login neither block each other nor see each other's conversations."""
 
     def __init__(self, clock=utc_now) -> None:  # noqa: ANN001 - a () -> datetime callable
         self.clock = clock
         self._items: dict[str, Conversation] = {}
-        self._busy: set[int] = set()
+        self._busy: set[Hashable] = set()
         self._lock = threading.Lock()
 
-    def open(self, user_id: int, conversation_id: str | None, not_before: datetime | None = None) -> Conversation:
+    def open(self, owner: Hashable, conversation_id: str | None, not_before: datetime | None = None) -> Conversation:
         """`not_before`: conversations started earlier are gone (e.g. the demo data was reset since)."""
         now = self.clock()
         with self._lock:
             for key in [k for k, c in self._items.items() if now - c.last_used > CONVERSATION_TTL
-                        or (not_before is not None and c.user_id == user_id and c.created_at < not_before)]:
+                        or (not_before is not None and c.owner == owner and c.created_at < not_before)]:
                 del self._items[key]
             if conversation_id is not None:
                 conv = self._items.get(conversation_id)
-                if conv is None or conv.user_id != user_id:
+                if conv is None or conv.owner != owner:
                     raise ConversationNotFound(conversation_id)
                 if conv.turns >= MAX_TURNS:
                     raise ConversationFull(conversation_id)
             else:
-                mine = [k for k, c in self._items.items() if c.user_id == user_id]
-                if len(mine) >= MAX_CONVERSATIONS_PER_USER:  # a user only ever evicts their own
+                mine = [k for k, c in self._items.items() if c.owner == owner]
+                if len(mine) >= MAX_CONVERSATIONS_PER_USER:  # an owner only ever evicts their own
                     del self._items[min(mine, key=lambda k: self._items[k].last_used)]
                 elif len(self._items) >= MAX_CONVERSATIONS:
                     del self._items[min(self._items, key=lambda k: self._items[k].last_used)]
                 new_id = str(uuid.uuid4())
-                conv = self._items[new_id] = Conversation(new_id, user_id, AgentMemory(new_id), created_at=now)
+                conv = self._items[new_id] = Conversation(new_id, owner, AgentMemory(new_id), created_at=now)
             conv.last_used = now
             return conv
 
-    def begin(self, user_id: int) -> bool:
+    def begin(self, owner: Hashable) -> bool:
         with self._lock:
-            if user_id in self._busy:
+            if owner in self._busy:
                 return False
-            self._busy.add(user_id)
+            self._busy.add(owner)
             return True
 
-    def end(self, user_id: int) -> None:
+    def end(self, owner: Hashable) -> None:
         with self._lock:
-            self._busy.discard(user_id)
+            self._busy.discard(owner)
 
 
 # --- the loop ------------------------------------------------------------------------------

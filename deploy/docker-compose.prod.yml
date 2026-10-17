@@ -1,0 +1,77 @@
+# Production stack on one server: Caddy (80/443) → Next.js → FastAPI → Postgres.
+# Values come from deploy/.env (never committed; template: deploy/env.production.example).
+# Run from the repo root: docker compose -f deploy/docker-compose.prod.yml up -d --build
+name: ledgerwise
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ledgerwise
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      POSTGRES_DB: ledgerwise
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledgerwise -d ledgerwise"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://ledgerwise:${POSTGRES_PASSWORD}@db:5432/ledgerwise
+      JWT_SECRET: ${JWT_SECRET:?set in deploy/.env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set in deploy/.env}
+      LLM_MODEL: ${LLM_MODEL:?set in deploy/.env}
+      LLM_MODEL_CLASSIFIER: ${LLM_MODEL_CLASSIFIER:-}
+      DAILY_LLM_BUDGET_USD: ${DAILY_LLM_BUDGET_USD:-5}
+      DEMO_TODAY: ${DEMO_TODAY:-2026-10-01}
+      CORS_ORIGINS: https://${DOMAIN:?set in deploy/.env}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build: ../frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:8000
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      DEMO_RESET_EVERY_HOURS: ${DEMO_RESET_EVERY_HOURS:-3}
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

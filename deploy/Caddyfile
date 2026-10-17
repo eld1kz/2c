@@ -1,0 +1,52 @@
+# Public edge: TLS (automatic Let's Encrypt), security headers, per-IP rate limits, then the Next.js
+# server. Only Caddy publishes ports; the backend and Postgres are reachable on the compose network only.
+{
+	email {$ACME_EMAIL}
+	order rate_limit before reverse_proxy
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		-X-Powered-By
+	}
+
+	# Per client IP, on top of the backend's per-user limits (T10, T12).
+	rate_limit {
+		zone sign_in {
+			match {
+				method POST
+				path /api/auth/login
+			}
+			key {remote_host}
+			events 20
+			window 1m
+		}
+		zone assistant {
+			match {
+				method POST
+				path /api/backend/chat /api/backend/memo
+			}
+			key {remote_host}
+			events 10
+			window 1m
+		}
+		zone all_requests {
+			key {remote_host}
+			events 600
+			window 1m
+		}
+	}
+
+	# flush_interval -1: stream chat server-sent events as they arrive.
+	reverse_proxy frontend:3000 {
+		flush_interval -1
+	}
+}
