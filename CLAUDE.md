@@ -23,6 +23,8 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 
 ## Git
 - Claude handles commits. Commit after each verified milestone (tests green), not after every file.
+- Commit only through `scripts/ship.sh "phase N: <summary>"`. It runs every check (backend tests, typecheck, lint, unit and browser tests) and the safety checks below, and commits and pushes only if all pass. Never hand-roll `git commit`/`git push`.
+- When running tests yourself, never pipe them without `set -o pipefail` (or don't pipe at all): `pytest | tail` exits 0 even when tests fail.
 - Message format: `phase N: <short summary>`, e.g. `phase 1: csv ingestion + categorization`.
 - No `Co-Authored-By` or other attribution lines in commit messages or PR descriptions (disabled in `.claude/settings.json`).
 - Never commit `.env`, `.venv`, `node_modules` or secrets. Check `git status` before each commit.
@@ -31,6 +33,7 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 ## Commands
 - Backend: `cd backend && uvicorn app.main:app --reload`
 - Tests: `cd backend && pytest -q`
+- Ship (the only way to commit): `scripts/ship.sh "phase N: <summary>"`
 - Seed: `cd backend && python -m seed.generate_golden && python -m seed.load`
 - Frontend: `cd frontend && npm run dev`
 - Local DB: `docker compose up -d db`
