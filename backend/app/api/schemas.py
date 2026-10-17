@@ -380,3 +380,24 @@ class CategoryIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     category: Category
+
+
+class CitationOut(BaseModel):
+    ref: str
+    valid: bool
+    label: str
+    reason: str | None
+
+
+class MemoBody(BaseModel):
+    message: str  # markdown with [[type:id]] citations
+    citations: list[CitationOut]
+    warnings: list[str]
+    as_of: date
+    generated_at: datetime | None  # None: not stored (its citation check failed)
+    generated_by: str | None
+
+
+class MemoOut(BaseModel):
+    memo: MemoBody | None  # this week's stored memo, if any
+    stale: bool  # the facts it was written from have changed since

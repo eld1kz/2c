@@ -25,7 +25,7 @@ def test_all_spec_tables_exist() -> None:
         "businesses", "users", "accounts", "counterparties", "transactions", "invoices",
         "invoice_lines", "recurring_series", "forecast_runs", "forecast_lines", "insights",
         "actions", "audit_events", "policies", "sandbox_payments", "sandbox_emails",
-        "sandbox_loan_applications", "category_rules", "llm_usage",
+        "sandbox_loan_applications", "category_rules", "llm_usage", "cfo_memos",
     }
 
 

@@ -1,7 +1,7 @@
 """Demo reset: put one business back to the golden demo state.
 
 Deletes everything the business owns except its Business row, its users, the audit log and LLM usage
-(real spend), then reloads the golden data through the same path as `seed.load` (no LLM: the
+(real spend), including the cached CFO memos, then reloads the golden data through the same path as `seed.load` (no LLM: the
 deterministic no-classifier path). AuditEvents are never deleted or changed: the reset appends a
 `demo_reset` event, so the chain keeps verifying. Chat conversations started before the reset are
 refused afterwards (routes_chat compares them with the latest `demo_reset` event).
@@ -25,6 +25,7 @@ from app.db.models import (
     AuditEvent,
     Business,
     CategoryRule,
+    CfoMemo,
     Counterparty,
     ForecastLine,
     ForecastRun,
@@ -61,6 +62,7 @@ def reset_demo(session: Session, business_id: int, actor: str, today: date,
     runs = select(ForecastRun.id).where(ForecastRun.business_id == business_id)
     counts = sandbox_reset.clear(session, business_id)
     for name, stmt in (
+        ("cfo_memos", delete(CfoMemo).where(CfoMemo.business_id == business_id)),
         ("actions", delete(Action).where(Action.business_id == business_id)),
         ("insights", delete(Insight).where(Insight.business_id == business_id)),
         ("forecast_lines", delete(ForecastLine).where(ForecastLine.run_id.in_(runs))),

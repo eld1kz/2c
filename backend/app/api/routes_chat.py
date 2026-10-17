@@ -81,10 +81,10 @@ def _sse(event: dict[str, Any]) -> str:
     return f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
 
 
-@router.post("/chat")
-def chat(body: ChatIn, user: User = Depends(current_user), session: Session = Depends(get_session),
-         settings: Settings = Depends(get_settings), model: ChatModel = Depends(get_chat_model),
-         session_factory: Callable[[], Session] = Depends(get_session_factory)) -> StreamingResponse:
+def admit(session: Session, user: User, settings: Settings) -> LlmBudget:
+    """Every check before an agent turn (chat or CFO memo): role, rate limits, the daily AI budget and
+    one turn in flight per user. Refusals are audited and raised; on success the caller must release
+    the lock with `conversations.end(user.id)`."""
     if user.role not in CHAT_ROLES:
         _refuse(session, user, 403, f"role {user.role.value} may not use the assistant")
     now = utc_now()
@@ -98,6 +98,14 @@ def chat(body: ChatIn, user: User = Depends(current_user), session: Session = De
                 event="chat_budget_exhausted")
     if not conversations.begin(user.id):
         _refuse(session, user, 429, "a reply is still streaming", {"Retry-After": "5"})
+    return budget
+
+
+@router.post("/chat")
+def chat(body: ChatIn, user: User = Depends(current_user), session: Session = Depends(get_session),
+         settings: Settings = Depends(get_settings), model: ChatModel = Depends(get_chat_model),
+         session_factory: Callable[[], Session] = Depends(get_session_factory)) -> StreamingResponse:
+    budget = admit(session, user, settings)
     limit = budget.limit
     user_id, message, today = user.id, body.message, settings.demo_today
     release = lambda: conversations.end(user_id)  # noqa: E731 - idempotent

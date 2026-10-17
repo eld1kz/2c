@@ -219,11 +219,13 @@ def _skipped(tool_uses: list[dict[str, Any]], reason: str) -> dict[str, Any]:
 
 
 def run_turn(session: Session, user: User, conversation: Conversation, user_text: str, model: ChatModel,
-             today: date, clock=utc_now, budget: LlmBudget | None = None) -> Iterator[dict[str, Any]]:  # noqa: ANN001
+             today: date, clock=utc_now, budget: LlmBudget | None = None,  # noqa: ANN001
+             allowed_tools: frozenset[str] | None = None) -> Iterator[dict[str, Any]]:
+    """`allowed_tools` narrows the tools offered (and accepted) to a fixed task, e.g. the CFO memo."""
     business = session.get(Business, user.business_id)
     memory = conversation.memory
     service = ActionService(session, today, clock)
-    ctx = ToolContext(session, user, business, today, service, memory)
+    ctx = ToolContext(session, user, business, today, service, memory, allowed=allowed_tools)
     conversation.turns += 1
     base = {"business_id": business.id, "conversation_id": conversation.id}
     masked = memory.vault.mask_text(strip_token_marks(strip_invisible(user_text)))
@@ -236,7 +238,7 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
     messages = conversation.messages
     messages.append({"role": "user", "content": masked})
     system = render_system(business, user.role, today)
-    tools = [spec.definition() for spec in tools_for(user)]
+    tools = [spec.definition() for spec in tools_for(user) if allowed_tools is None or spec.name in allowed_tools]
     exists = lambda ref: record_exists(session, business.id, ref)  # noqa: E731
 
     action_ids: list[int] = []

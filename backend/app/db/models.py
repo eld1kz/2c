@@ -493,3 +493,20 @@ class LlmUsage(Base):
     cache_read_tokens: Mapped[int] = mapped_column(Integer)
     cache_write_tokens: Mapped[int] = mapped_column(Integer)
     cost_microusd: Mapped[int] = mapped_column(BigInteger)
+
+
+class CfoMemo(Base):
+    """The weekly CFO memo, cached so viewing it never calls the model. Only memos whose every figure
+    passed the citation check are stored; `facts_digest` tells whether the numbers changed since. Demo
+    reset deletes them."""
+
+    __tablename__ = "cfo_memos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), index=True)
+    as_of: Mapped[dt.date] = mapped_column(Date)  # DEMO_TODAY when written
+    generated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True))
+    generated_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    message: Mapped[str] = mapped_column(Text)
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    facts_digest: Mapped[str] = mapped_column(String(64))

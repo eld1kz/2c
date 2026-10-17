@@ -235,7 +235,7 @@ Fictional vendor names only (no real brands).
 - `/approvals` — mobile-first inbox: action, why, evidence, impact, Approve/Reject
 - `/audit` — event list + "Verify chain" button
 - `/upload` — CSV upload with preview
-- `/memo` — weekly CFO memo
+- `/memo` — weekly CFO memo: written on demand by the agent from engine facts (`draft_cfo_memo` only), every figure cited; only a fully cited memo is cached (viewing never calls the model), a notice shows when the facts changed since; owner/accountant write it, every role reads it; demo reset clears it
 - `/what-if` — before/after 13-week forecast for a scenario (from a chat what-if or the cash-gap card); scenario inputs shown as assumptions, never as verified figures; financing comparison for the base gap and the gap left after the scenario. Owner/accountant (viewers: READ only)
 
 Seeded demo users: owner@emberoak.demo, accountant@emberoak.demo, viewer@emberoak.demo.

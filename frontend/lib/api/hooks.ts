@@ -53,6 +53,21 @@ export const useFinancing = (scenarios: ScenarioInput[], enabled = true) =>
     retry: false,
   });
 
+export const useCfoMemo = () =>
+  useQuery({ queryKey: ["memo"], queryFn: async () => unwrap(await api.GET("/memo")) });
+
+/** Writes this week's memo with the assistant (spends AI budget once; the result is cached server-side). */
+export function useGenerateMemo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(await api.POST("/memo")),
+    onSuccess: (data) => {
+      if (data.memo?.generated_at) queryClient.setQueryData(["memo"], data);
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: keys.budget }),
+  });
+}
+
 export const useBudget = () =>
   useQuery({ queryKey: keys.budget, queryFn: async () => unwrap(await api.GET("/llm-budget")), refetchInterval: 60_000 });
 

@@ -108,6 +108,7 @@ class ToolContext:
     service: ActionService
     memory: AgentMemory
     proposals: int = 0  # EXECUTE proposals made in this turn
+    allowed: frozenset[str] | None = None  # the only tools this turn may use (None: every tool the role has)
 
     def snapshot(self) -> Snapshot:
         return load_snapshot(self.session, self.business.id, self.today)
@@ -603,6 +604,8 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
             raise ToolInputError("tool input must be a JSON object")
         if not can_propose(ctx.user.role, spec.tier, name):  # before anything is proposed or stored
             raise ToolInputError(f"{name} is not available to the {ctx.user.role.value} role")
+        if ctx.allowed is not None and name not in ctx.allowed:
+            raise ToolInputError(f"{name} is not available in this task")
         if spec.handler is None:
             if ctx.proposals >= MAX_PROPOSALS_PER_TURN:
                 raise ToolInputError(f"at most {MAX_PROPOSALS_PER_TURN} proposals per turn; ask the user first")

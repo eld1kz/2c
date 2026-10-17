@@ -12,6 +12,8 @@ describe("backend proxy allowlist", () => {
     ["GET", "actions"],
     ["POST", "whatif"],
     ["POST", "financing"],
+    ["GET", "memo"],
+    ["POST", "memo"],
   ])("allows %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(true));
 
   it.each([
