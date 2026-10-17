@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { BudgetMeter } from "@/components/shell/budget-meter";
 import { Money } from "@/components/money";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +28,7 @@ export function SideRail() {
           <Skeleton className="mt-2 h-12" />
         )}
       </section>
-      <section className="bg-surface p-4">
+      <Link href="/approvals" className="bg-surface p-4 hover:bg-sunken/50">
         <h2 className="text-sm text-ink-2">Waiting for approval</h2>
         {pending.data ? (
           <>
@@ -38,7 +40,7 @@ export function SideRail() {
         ) : (
           <Skeleton className="mt-2 h-12" />
         )}
-      </section>
+      </Link>
       <section className="col-span-2 bg-surface p-4 md:hidden">
         <BudgetMeter />
         <p className="mt-2 text-xs text-ink-3">Forecasts and approvals don&apos;t use the AI budget.</p>

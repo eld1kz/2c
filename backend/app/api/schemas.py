@@ -44,6 +44,38 @@ class ActionIn(BaseModel):
         return self
 
 
+class DraftEmailOut(BaseModel):
+    to_name: str | None
+    subject: str | None
+    body: str | None
+
+
+class SandboxResultOut(BaseModel):
+    kind: str  # email | payment | loan_application
+    id: int
+    status: str
+    summary: str
+    subject: str | None
+    at: datetime | None
+
+
+class ActionDisplayOut(BaseModel):
+    """Server-built summary for an approval card (see services/action_display.py)."""
+
+    title: str
+    counterparty: "EvidenceRef | None"
+    invoice: "EvidenceRef | None"
+    amount_cents: int | None
+    currency: str
+    invoice_outstanding_cents: int | None
+    days_past_due: int | None
+    scheduled_date: date | None
+    email: DraftEmailOut | None
+    sandbox: SandboxResultOut | None
+    denied_reason: str | None
+    evidence: "list[EvidenceRef]"
+
+
 class ActionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,6 +91,7 @@ class ActionOut(BaseModel):
     decided_by: int | None
     decided_at: datetime | None
     result: dict[str, Any] | None
+    display: ActionDisplayOut | None = None
 
 
 class AuditEventOut(BaseModel):
@@ -224,3 +257,6 @@ class RecordOut(BaseModel):
     kind: str
     label: str | None
     data: dict[str, Any]
+
+
+ActionDisplayOut.model_rebuild()

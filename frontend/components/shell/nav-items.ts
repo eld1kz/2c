@@ -1,4 +1,4 @@
-import { LayoutDashboardIcon, MessageSquareTextIcon } from "lucide-react";
+import { InboxIcon, LayoutDashboardIcon, MessageSquareTextIcon } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -11,4 +11,5 @@ export type NavItem = {
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
   { href: "/chat", label: "Ask the CFO", icon: MessageSquareTextIcon },
+  { href: "/approvals", label: "Approvals", icon: InboxIcon, badge: "approvals" },
 ];

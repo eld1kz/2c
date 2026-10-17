@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "./client";
 
@@ -56,3 +56,22 @@ export const useRecordLabels = (refs: string[]) =>
     queryFn: async () => unwrap(await api.GET("/records", { params: { query: { ref: refs } } })),
     staleTime: Infinity,
   });
+
+export const useActions = () =>
+  useQuery({ queryKey: ["actions", "all"], queryFn: async () => unwrap(await api.GET("/actions")) });
+
+/** Approve or reject. On success every view that depends on actions or cash is refreshed. */
+export function useDecide() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, decision }: { id: number; decision: "approve" | "reject" }) =>
+      decision === "approve"
+        ? unwrap(await api.POST("/actions/{action_id}/approve", { params: { path: { action_id: id } } }))
+        : unwrap(await api.POST("/actions/{action_id}/reject", { params: { path: { action_id: id } } })),
+    onSettled: () => {
+      for (const key of [["actions"], keys.position, keys.forecast, keys.insights]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+  });
+}

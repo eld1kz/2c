@@ -13,7 +13,7 @@ const ALLOWED: Record<"GET" | "POST", RegExp[]> = {
     /^records$/,
     /^records\/[a-z_]{1,30}:\d{1,12}$/,
   ],
-  POST: [/^chat$/],
+  POST: [/^chat$/, /^actions\/\d{1,12}\/(approve|reject)$/],
 };
 
 export function isAllowed(method: string, path: string): boolean {

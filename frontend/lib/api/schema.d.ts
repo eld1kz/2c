@@ -298,6 +298,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActionDisplayOut
+         * @description Server-built summary for an approval card (see services/action_display.py).
+         */
+        ActionDisplayOut: {
+            /** Title */
+            title: string;
+            counterparty: components["schemas"]["EvidenceRef"] | null;
+            invoice: components["schemas"]["EvidenceRef"] | null;
+            /** Amount Cents */
+            amount_cents: number | null;
+            /** Currency */
+            currency: string;
+            /** Invoice Outstanding Cents */
+            invoice_outstanding_cents: number | null;
+            /** Days Past Due */
+            days_past_due: number | null;
+            /** Scheduled Date */
+            scheduled_date: string | null;
+            email: components["schemas"]["DraftEmailOut"] | null;
+            sandbox: components["schemas"]["SandboxResultOut"] | null;
+            /** Denied Reason */
+            denied_reason: string | null;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
+        };
         /** ActionIn */
         ActionIn: {
             /** Tool */
@@ -346,6 +372,7 @@ export interface components {
             result: {
                 [key: string]: unknown;
             } | null;
+            display?: components["schemas"]["ActionDisplayOut"] | null;
         };
         /**
          * ActionStatus
@@ -385,6 +412,15 @@ export interface components {
             message: string;
             /** Conversation Id */
             conversation_id?: string | null;
+        };
+        /** DraftEmailOut */
+        DraftEmailOut: {
+            /** To Name */
+            to_name: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Body */
+            body: string | null;
         };
         /** EvidenceRef */
         EvidenceRef: {
@@ -636,6 +672,21 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** SandboxResultOut */
+        SandboxResultOut: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
+            /** Summary */
+            summary: string;
+            /** Subject */
+            subject: string | null;
+            /** At */
+            at: string | null;
         };
         /** TokenOut */
         TokenOut: {
