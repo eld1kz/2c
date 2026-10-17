@@ -9,12 +9,12 @@ import { AskLink } from "@/components/chat/ask-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useForecast, useInsights } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
-import { askAbout } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
 
 import { CashHeadline } from "./cash-headline";
 import { ForecastChart } from "./forecast-chart";
 import { ForecastTable } from "./forecast-table";
+import { InsightActions } from "./insight-actions";
 import { InsightCard } from "./insight-card";
 import { SideRail } from "./side-rail";
 
@@ -112,7 +112,7 @@ export function DashboardView() {
         </div>
         <div className="mt-1 divide-y divide-line border-t border-line">
           {insights.data
-            ? insights.data.slice(0, TOP_INSIGHTS).map((i) => <InsightCard key={i.id} insight={i} action={<AskLink question={askAbout(i)} />} />)
+            ? insights.data.slice(0, TOP_INSIGHTS).map((i) => <InsightCard key={i.id} insight={i} action={<InsightActions insight={i} />} />)
             : Array.from({ length: TOP_INSIGHTS }, (_, i) => <Skeleton key={i} className="my-4 h-16" />)}
           {insights.data?.length === 0 && <p className="py-4 text-sm text-ink-3">No open issues right now.</p>}
         </div>

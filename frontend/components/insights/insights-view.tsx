@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 
-import { AskLink } from "@/components/chat/ask-link";
+import { InsightActions } from "@/components/dashboard/insight-actions";
 import { InsightCard } from "@/components/dashboard/insight-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInsights } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
-import { askAbout, SEVERITY } from "@/lib/labels";
+import { SEVERITY } from "@/lib/labels";
 
 const FILTERS = ["all", "high", "med", "low"] as const;
 
@@ -38,7 +38,7 @@ export function InsightsView() {
         {isLoading && <Skeleton className="my-4 h-40" />}
         {isError && <p className="py-4 text-sm text-risk-ink">Insights couldn&apos;t be loaded. Refresh to try again.</p>}
         {rows.map((i) => (
-          <InsightCard key={i.id} insight={i} action={<AskLink question={askAbout(i)} />} />
+          <InsightCard key={i.id} insight={i} action={<InsightActions insight={i} />} />
         ))}
         {data && rows.length === 0 && <p className="py-6 text-sm text-ink-3">Nothing at this priority.</p>}
       </div>

@@ -206,3 +206,16 @@ def test_every_call_is_audited(demo: Demo) -> None:
     events = list(demo.session.scalars(select(AuditEvent).where(AuditEvent.event_type == "agent_tool_called")))
     assert [(e.payload["tool"], e.payload["ok"]) for e in events] == [("get_insights", True), ("explain_record", False)]
     assert all(e.actor == f"agent:user:{demo.users['owner'].id}" for e in events)
+
+
+def test_what_if_tools_hand_the_ui_their_validated_scenarios(demo: Demo) -> None:
+    ctx = _ctx(demo)
+    inv = demo.invoices["INV-1042"].id
+    _, whatif = _call(ctx, "run_what_if", scenarios=[{"type": "collect_receivable", "invoice_id": inv}])
+    assert whatif.scenarios == [{"type": "collect_receivable", "invoice_id": inv}]
+    _, ranked = _call(ctx, "rank_financing")
+    assert ranked.scenarios == []  # the base gap
+    _, failed = _call(ctx, "run_what_if", scenarios=[{"type": "collect_receivable", "invoice_id": 99_999}])
+    assert failed.is_error and failed.scenarios is None
+    _, other = _call(ctx, "get_cash_position")
+    assert other.scenarios is None

@@ -1,13 +1,15 @@
 // Server-sent events from POST /chat, mirroring `run_turn` in backend/app/agent/runner.py.
 // Not in OpenAPI (it's a stream), so typed by hand; keep in sync with the runner.
 
+import type { ScenarioInput } from "@/lib/scenarios";
+
 export type Citation = { ref: string; valid: boolean; label: string; reason: string | null };
 export type ProposedAction = { action_id: number; tool: string; status: string };
 
 export type ChatEvent =
   | { event: "turn"; data: { conversation_id: string; turn: number } }
   | { event: "text"; data: { delta: string } }
-  | { event: "tool"; data: { name: string; tier: string | null; ok: boolean } }
+  | { event: "tool"; data: { name: string; tier: string | null; ok: boolean; scenarios?: ScenarioInput[] } }
   | { event: "action"; data: ProposedAction }
   | { event: "reset"; data: { reason: string; problems: string[] } }
   | {

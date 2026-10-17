@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import type { ScenarioInput } from "@/lib/scenarios";
+
 import { api, ApiError, detailOf, type Schemas, unwrap } from "./client";
 
 export const keys = {
@@ -32,6 +34,15 @@ export const useForecastWeek = (week: number | null) =>
 
 export const useInsights = () =>
   useQuery({ queryKey: keys.insights, queryFn: async () => unwrap(await api.GET("/insights")) });
+
+/** Before/after forecast for a scenario. A simulation: it writes nothing, so it is cached like a read. */
+export const useWhatIf = (scenarios: ScenarioInput[], enabled = true) =>
+  useQuery({
+    queryKey: ["whatif", JSON.stringify(scenarios)],
+    enabled: enabled && scenarios.length > 0,
+    queryFn: async () => unwrap(await api.POST("/whatif", { body: { scenarios } })),
+    retry: false,
+  });
 
 export const useBudget = () =>
   useQuery({ queryKey: keys.budget, queryFn: async () => unwrap(await api.GET("/llm-budget")), refetchInterval: 60_000 });

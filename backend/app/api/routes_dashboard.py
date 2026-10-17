@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, get_session
 from app.api.schemas import (
+    AtRiskReceivableOut,
     EvidenceRef,
     ForecastLineOut,
     ForecastOut,
@@ -43,10 +44,17 @@ def _evidence(session: Session, business_id: int, refs: list[str]) -> list[Evide
     return [EvidenceRef(ref=r, label=names.get(r)) for r in refs]
 
 
-def _week(w: Week) -> ForecastWeekOut:
+def week_out(w: Week) -> ForecastWeekOut:
     return ForecastWeekOut(week=w.week, label=f"Week {w.week} ({w.start:%b} {w.start.day})", start=w.start,
                            end=w.start + timedelta(days=6), opening_cents=w.opening, inflows_cents=w.inflows,
                            outflows_cents=w.outflows, closing_cents=w.closing, below_buffer=w.below_buffer)
+
+
+def gap_out(fc: Forecast) -> GapOut | None:
+    gap = fc.gap()
+    return None if gap is None else GapOut(
+        first_week=gap.first_week, last_week=gap.last_week, low_week=gap.low_week, amount_cents=gap.amount,
+        start=gap.start, low_week_end=gap.low_week_end, weeks_below=[w.week for w in fc.weeks if w.below_buffer])
 
 
 def _forecast(session: Session, user: User, today: date) -> Forecast:
@@ -75,16 +83,19 @@ def position(user: User = Depends(current_user), session: Session = Depends(get_
 @router.get("/forecast", response_model=ForecastOut)
 def forecast(user: User = Depends(current_user), session: Session = Depends(get_session),
              settings: Settings = Depends(get_settings)) -> ForecastOut:
-    fc = _forecast(session, user, settings.demo_today)
+    snap = load_snapshot(session, user.business_id, settings.demo_today)
+    fc = project(snap)
     low = min(fc.weeks, key=lambda w: (w.closing, w.week))
-    gap = fc.gap()
+    at_risk = [snap.invoice_by_id[int(r.partition(":")[2])] for r in fc.assumptions.get("at_risk_receivables", [])]
+    names = ledger.labels(session, user.business_id, [f"invoice:{i.id}" for i in at_risk])
     return ForecastOut(
         as_of=fc.as_of, currency=fc.currency, min_cash_buffer_cents=fc.min_cash_buffer,
-        weeks=[_week(w) for w in fc.weeks], lowest=LowestOut(week=low.week, closing_cents=low.closing),
-        gap=None if gap is None else GapOut(
-            first_week=gap.first_week, last_week=gap.last_week, low_week=gap.low_week, amount_cents=gap.amount,
-            start=gap.start, low_week_end=gap.low_week_end,
-            weeks_below=[w.week for w in fc.weeks if w.below_buffer]),
+        weeks=[week_out(w) for w in fc.weeks], lowest=LowestOut(week=low.week, closing_cents=low.closing),
+        gap=gap_out(fc),
+        at_risk_receivables=[AtRiskReceivableOut(
+            invoice=EvidenceRef(ref=f"invoice:{i.id}", label=names.get(f"invoice:{i.id}")), number=i.number,
+            counterparty_name=snap.counterparties[i.counterparty_id].name, outstanding_cents=i.outstanding)
+            for i in at_risk],
     )
 
 
@@ -97,7 +108,7 @@ def forecast_week(week: int = Path(ge=1, le=HORIZON_WEEKS), user: User = Depends
     names = ledger.labels(session, user.business_id, [s for ln in lines for s in ln.source_ids])
     cps = ledger.labels(session, user.business_id,
                         [f"counterparty:{ln.counterparty_id}" for ln in lines if ln.counterparty_id])
-    return ForecastWeekLinesOut(week=_week(fc.weeks[week - 1]), lines=[
+    return ForecastWeekLinesOut(week=week_out(fc.weeks[week - 1]), lines=[
         ForecastLineOut(date=ln.on, kind=ln.kind.value, amount_cents=ln.amount, face_cents=ln.face,
                         probability_bp=ln.probability_bp, probability_display=f"{ln.probability_bp / 100:g}%",
                         counterparty_name=cps.get(f"counterparty:{ln.counterparty_id}"),

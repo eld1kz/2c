@@ -1,10 +1,12 @@
+import type { ScenarioInput } from "@/lib/scenarios";
+
 import type { ChatEvent, Citation, ProposedAction } from "./events";
 
 // One question and its answer. Streamed text is only ever `provisional`: it is shown as a draft and
 // dropped on `reset`, `done`, `error` or a broken stream. The only final answer is `done.message`.
 
 export type TrailItem =
-  | { kind: "tool"; name: string; tier: string | null; ok: boolean }
+  | { kind: "tool"; name: string; tier: string | null; ok: boolean; scenarios?: ScenarioInput[] }
   | { kind: "action"; action: ProposedAction }
   | { kind: "reset"; problems: string[] };
 

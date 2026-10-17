@@ -1,12 +1,13 @@
 """Pydantic request/response models for the HTTP API."""
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.audit.log import json_problem
 from app.db.models import Category
+from app.services.scenarios import MAX_SCENARIOS, ScenarioIn
 
 
 class LoginIn(BaseModel):
@@ -202,6 +203,15 @@ class LowestOut(BaseModel):
     closing_cents: int
 
 
+class AtRiskReceivableOut(BaseModel):
+    """An open receivable the forecast counts as at risk (0% collection): a what-if to try on the gap."""
+
+    invoice: EvidenceRef
+    number: str
+    counterparty_name: str
+    outstanding_cents: int
+
+
 class ForecastOut(BaseModel):
     as_of: date
     currency: str
@@ -209,6 +219,51 @@ class ForecastOut(BaseModel):
     weeks: list[ForecastWeekOut]
     lowest: LowestOut
     gap: GapOut | None
+    at_risk_receivables: list[AtRiskReceivableOut]
+
+
+class WhatIfIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenarios: list[ScenarioIn] = Field(min_length=1, max_length=MAX_SCENARIOS)
+
+
+class AssumptionOut(BaseModel):
+    """One scenario input, shown as an assumption, never as a recorded fact. `amount_source` says whether the
+    amount is a record's (an invoice's outstanding balance, a series' typical amount) or was typed in
+    ("supplied") by a person or the assistant."""
+
+    type: str
+    invoice: EvidenceRef | None = None
+    series: EvidenceRef | None = None
+    counterparty_name: str | None = None
+    on: date | None = None
+    days: int | None = None
+    cadence: str | None = None
+    amount_cents: int | None = None
+    amount_source: Literal["records", "supplied"] | None = None
+
+
+class WhatIfWeekOut(BaseModel):
+    week: int
+    label: str
+    start: date
+    end: date
+    base_closing_cents: int
+    scenario_closing_cents: int
+    change_cents: int  # scenario − base
+    base_below_buffer: bool
+    scenario_below_buffer: bool
+
+
+class WhatIfOut(BaseModel):
+    as_of: date
+    currency: str
+    min_cash_buffer_cents: int
+    assumptions: list[AssumptionOut]
+    weeks: list[WhatIfWeekOut]
+    base_gap: GapOut | None
+    scenario_gap: GapOut | None
 
 
 class ForecastLineOut(BaseModel):

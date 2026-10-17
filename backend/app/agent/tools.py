@@ -18,8 +18,8 @@ import re
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, timedelta
-from typing import Annotated, Any, Literal
+from datetime import date
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
@@ -30,7 +30,6 @@ from app.audit import log as audit
 from app.auth.rbac import can_propose
 from app.db.models import (
     Business,
-    Cadence,
     Category,
     InsightStatus,
     InsightType,
@@ -50,8 +49,6 @@ from app.engine.whatif import (
     CollectReceivable,
     DelayReceivable,
     OneOff,
-    RemoveSeries,
-    Scenario,
     ScenarioError,
     run_what_if,
 )
@@ -65,6 +62,7 @@ from app.services import ledger
 from app.services.action_service import ActionError, ActionService, actor_for
 from app.services.drafts import Tone
 from app.services.ledger import UntrustedText
+from app.services.scenarios import MAX_SCENARIOS, ScenarioIn, check_targets, to_scenarios
 
 MAX_UNTRUSTED_CHARS = 600
 MAX_RATIONALE_CHARS = 500
@@ -73,8 +71,6 @@ MAX_PROPOSALS_PER_TURN = 3
 MAX_SOURCE_IDS = 5
 MAX_INSIGHT_EVIDENCE = 6
 LEDGER_DROP = ("currency", "category_source")  # same for every row, or not useful to the model
-MAX_SCENARIO_CENTS = 100_000_000  # $1,000,000
-MAX_SCENARIO_DAYS = 91  # 13 weeks: the forecast horizon
 INSTRUCTION_LIKE = re.compile(
     r"ignore (?:all |any )?(?:previous|prior|above)|system (?:notice|prompt|message)|\bai assistant\b|"
     r"pre-?approved|do not ask|chang(?:e|ed) (?:of )?bank|new (?:bank|account)|beneficiary|wire|"
@@ -119,6 +115,7 @@ class ToolOutcome:
     is_error: bool
     tier: Tier | None
     action: dict[str, Any] | None = None  # {action_id, tool, status} for EXECUTE proposals
+    scenarios: list[dict[str, Any]] | None = None  # validated what-if inputs (run_what_if / rank_financing), for the UI
 
 
 class ToolInputError(ValueError):
@@ -161,47 +158,12 @@ class ExplainIn(_In):
     ref: str = Field(pattern=rf"^({'|'.join(ledger.REF_TYPES)}):\d+$", description='e.g. "invoice:30"')
 
 
-class CollectIn(_In):
-    type: Literal["collect_receivable"]
-    invoice_id: int
-    on: date | None = Field(None, description="collection date; default today (collected now)")
-
-
-class DelayIn(_In):
-    type: Literal["delay_receivable"]
-    invoice_id: int
-    days: int = Field(ge=1, le=MAX_SCENARIO_DAYS)
-
-
-class AddRecurringIn(_In):
-    type: Literal["add_recurring"]
-    amount_cents: int = Field(description="signed cents per occurrence: negative = cost, positive = income; "
-                                          "at most $1,000,000 either way")
-    cadence: Cadence
-    start: date
-
-
-class OneOffIn(_In):
-    type: Literal["one_off"]
-    amount_cents: int = Field(description="signed cents: negative = payment out, positive = money in; "
-                                          "at most $1,000,000 either way")
-    on: date
-
-
-class RemoveSeriesIn(_In):
-    type: Literal["remove_series"]
-    series_id: int
-
-
-ScenarioIn = Annotated[CollectIn | DelayIn | AddRecurringIn | OneOffIn | RemoveSeriesIn, Field(discriminator="type")]
-
-
 class WhatIfIn(_In):
-    scenarios: list[ScenarioIn] = Field(min_length=1, max_length=5)
+    scenarios: list[ScenarioIn] = Field(min_length=1, max_length=MAX_SCENARIOS)
 
 
 class FinancingIn(_In):
-    scenarios: list[ScenarioIn] = Field(default_factory=list, max_length=5,
+    scenarios: list[ScenarioIn] = Field(default_factory=list, max_length=MAX_SCENARIOS,
                                         description="rank the gap left after these what-if scenarios (default: none)")
 
 
@@ -325,42 +287,6 @@ def _register_weeks(ctx: ToolContext, forecast: Forecast) -> None:
         ctx.memory.index.add_computed(f"forecast_week:{w.week}", week_label(w.week, w.start))
 
 
-def _scenarios(items: list[Any], today: date) -> list[Scenario]:
-    out: list[Scenario] = []
-    for s in items:
-        match s:
-            case CollectIn():
-                out.append(CollectReceivable(s.invoice_id, s.on or today))
-            case DelayIn():
-                out.append(DelayReceivable(s.invoice_id, s.days))
-            case AddRecurringIn():
-                out.append(AddRecurring(s.amount_cents, s.cadence, s.start))
-            case OneOffIn():
-                out.append(OneOff(s.amount_cents, s.on))
-            case RemoveSeriesIn():
-                out.append(RemoveSeries(s.series_id))
-    return out
-
-
-def _check_scenario_targets(ctx: ToolContext, scenarios: list[Scenario]) -> None:
-    last = ctx.today + timedelta(days=MAX_SCENARIO_DAYS)
-    for s in scenarios:
-        on = getattr(s, "on", None) or getattr(s, "start", None)
-        if on is not None and not ctx.today <= on <= last:
-            raise ScenarioError(f"scenario dates must be between {ctx.today} and {last}")
-        if isinstance(s, (AddRecurring, OneOff)) and not 0 < abs(s.amount) <= MAX_SCENARIO_CENTS:
-            raise ScenarioError(f"scenario amounts must be non-zero and at most "
-                                f"{money(MAX_SCENARIO_CENTS, ctx.business.base_currency)} either way")
-        if isinstance(s, (CollectReceivable, DelayReceivable)):
-            ref = f"invoice:{s.invoice_id}"
-        elif isinstance(s, RemoveSeries):
-            ref = f"recurring_series:{s.series_id}"
-        else:
-            continue
-        if not ledger.record_exists(ctx.session, ctx.business.id, ref):
-            raise ScenarioError(f"{ref} not found")
-
-
 # --- handlers ------------------------------------------------------------------------------
 
 
@@ -429,8 +355,8 @@ def _explain_record(ctx: ToolContext, p: ExplainIn) -> dict[str, Any]:
 
 
 def _run_what_if(ctx: ToolContext, p: WhatIfIn) -> dict[str, Any]:
-    scenarios = _scenarios(p.scenarios, ctx.today)
-    _check_scenario_targets(ctx, scenarios)
+    scenarios = to_scenarios(p.scenarios, ctx.today)
+    check_targets(ctx.session, ctx.business.id, ctx.business.base_currency, ctx.today, scenarios)
     base = project(ctx.snapshot())
     result = run_what_if(base, scenarios)
     ctx.memory.whatif_runs += 1
@@ -459,8 +385,8 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
     forecast = project(snap)
     _register_weeks(ctx, forecast)
     if p.scenarios:
-        scenarios = _scenarios(p.scenarios, ctx.today)
-        _check_scenario_targets(ctx, scenarios)
+        scenarios = to_scenarios(p.scenarios, ctx.today)
+        check_targets(ctx.session, ctx.business.id, ctx.business.base_currency, ctx.today, scenarios)
         forecast = run_what_if(forecast, scenarios).scenario
     gap = forecast.gap()
     based_on = "the forecast after the given what-if scenarios" if p.scenarios else "the base forecast"
@@ -655,7 +581,7 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
     except database errors."""
     spec = TOOLS.get(name)
     tier = spec.tier if spec else None
-    action = None
+    action, parsed = None, None
     tool_input = ctx.memory.vault.mask(tool_input)  # backstop: model input is stored and audited masked
     try:
         if spec is None:
@@ -670,7 +596,8 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
             ctx.proposals += 1
             data, action = _propose(ctx, name, tool_input)
         else:
-            data = spec.handler(ctx, spec.input_model.model_validate(tool_input))
+            parsed = spec.input_model.model_validate(tool_input)
+            data = spec.handler(ctx, parsed)
     except ValidationError as e:
         problems = "; ".join(f"{'.'.join(map(str, err['loc'])) or 'input'}: {err['msg']}" for err in e.errors())
         return _error(ctx, name, tier, tool_input, f"invalid input ({problems})")
@@ -679,7 +606,9 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
     shown = ctx.memory.vault.mask(present(data, ctx.business.base_currency, cents=spec.cents or spec.handler is None))
     ctx.memory.index.add_result(shown)
     _audit_call(ctx, name, tier, tool_input, True, action)
-    return ToolOutcome(_result(name, True, {"data": shown}), False, tier, action)
+    scenarios = ([sc.model_dump(mode="json", exclude_none=True) for sc in parsed.scenarios]
+                 if isinstance(parsed, (WhatIfIn, FinancingIn)) else None)
+    return ToolOutcome(_result(name, True, {"data": shown}), False, tier, action, scenarios)
 
 
 def _error(ctx: ToolContext, name: str, tier: Tier | None, tool_input: Any, message: str) -> ToolOutcome:

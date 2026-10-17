@@ -322,7 +322,8 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
                     executed = executed or outcome.action["status"] == "executed"
                     yield _event("action", **outcome.action)
                 yield _event("tool", name=block["name"], tier=outcome.tier.value if outcome.tier else None,
-                             ok=not outcome.is_error)
+                             ok=not outcome.is_error,
+                             **({} if outcome.scenarios is None else {"scenarios": outcome.scenarios}))
                 results.append({"type": "tool_result", "tool_use_id": block["id"], "content": outcome.content,
                                 "is_error": outcome.is_error})
             messages.append({"role": "user", "content": results})

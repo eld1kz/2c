@@ -328,6 +328,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Whatif */
+        post: operations["whatif_whatif_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -430,6 +447,62 @@ export interface components {
          * @enum {string}
          */
         ActionStatus: "proposed" | "approved" | "rejected" | "executed" | "failed" | "denied";
+        /** AddRecurringIn */
+        AddRecurringIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "add_recurring";
+            /**
+             * Amount Cents
+             * @description signed cents per occurrence: negative = cost, positive = income; at most $1,000,000 either way
+             */
+            amount_cents: number;
+            cadence: components["schemas"]["Cadence"];
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
+        /**
+         * AssumptionOut
+         * @description One scenario input, shown as an assumption, never as a recorded fact. `amount_source` says whether the
+         *     amount is a record's (an invoice's outstanding balance, a series' typical amount) or was typed in
+         *     ("supplied") by a person or the assistant.
+         */
+        AssumptionOut: {
+            /** Type */
+            type: string;
+            invoice?: components["schemas"]["EvidenceRef"] | null;
+            series?: components["schemas"]["EvidenceRef"] | null;
+            /** Counterparty Name */
+            counterparty_name?: string | null;
+            /** On */
+            on?: string | null;
+            /** Days */
+            days?: number | null;
+            /** Cadence */
+            cadence?: string | null;
+            /** Amount Cents */
+            amount_cents?: number | null;
+            /** Amount Source */
+            amount_source?: ("records" | "supplied") | null;
+        };
+        /**
+         * AtRiskReceivableOut
+         * @description An open receivable the forecast counts as at risk (0% collection): a what-if to try on the gap.
+         */
+        AtRiskReceivableOut: {
+            invoice: components["schemas"]["EvidenceRef"];
+            /** Number */
+            number: string;
+            /** Counterparty Name */
+            counterparty_name: string;
+            /** Outstanding Cents */
+            outstanding_cents: number;
+        };
         /** AuditEventOut */
         AuditEventOut: {
             /** Seq */
@@ -458,6 +531,11 @@ export interface components {
             file: string;
         };
         /**
+         * Cadence
+         * @enum {string}
+         */
+        Cadence: "weekly" | "monthly" | "quarterly";
+        /**
          * Category
          * @enum {string}
          */
@@ -472,6 +550,33 @@ export interface components {
             message: string;
             /** Conversation Id */
             conversation_id?: string | null;
+        };
+        /** CollectIn */
+        CollectIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "collect_receivable";
+            /** Invoice Id */
+            invoice_id: number;
+            /**
+             * On
+             * @description collection date; default today (collected now)
+             */
+            on?: string | null;
+        };
+        /** DelayIn */
+        DelayIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "delay_receivable";
+            /** Invoice Id */
+            invoice_id: number;
+            /** Days */
+            days: number;
         };
         /** DraftEmailOut */
         DraftEmailOut: {
@@ -526,6 +631,8 @@ export interface components {
             weeks: components["schemas"]["ForecastWeekOut"][];
             lowest: components["schemas"]["LowestOut"];
             gap: components["schemas"]["GapOut"] | null;
+            /** At Risk Receivables */
+            at_risk_receivables: components["schemas"]["AtRiskReceivableOut"][];
         };
         /** ForecastWeekLinesOut */
         ForecastWeekLinesOut: {
@@ -699,6 +806,24 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** OneOffIn */
+        OneOffIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "one_off";
+            /**
+             * Amount Cents
+             * @description signed cents: negative = payment out, positive = money in; at most $1,000,000 either way
+             */
+            amount_cents: number;
+            /**
+             * On
+             * Format: date
+             */
+            on: string;
+        };
         /** PositionOut */
         PositionOut: {
             /**
@@ -732,6 +857,16 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** RemoveSeriesIn */
+        RemoveSeriesIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "remove_series";
+            /** Series Id */
+            series_id: number;
         };
         /** ResetOut */
         ResetOut: {
@@ -850,6 +985,56 @@ export interface components {
             broken_at_seq: number | null;
             /** Reason */
             reason: string | null;
+        };
+        /** WhatIfIn */
+        WhatIfIn: {
+            /** Scenarios */
+            scenarios: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"])[];
+        };
+        /** WhatIfOut */
+        WhatIfOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Min Cash Buffer Cents */
+            min_cash_buffer_cents: number;
+            /** Assumptions */
+            assumptions: components["schemas"]["AssumptionOut"][];
+            /** Weeks */
+            weeks: components["schemas"]["WhatIfWeekOut"][];
+            base_gap: components["schemas"]["GapOut"] | null;
+            scenario_gap: components["schemas"]["GapOut"] | null;
+        };
+        /** WhatIfWeekOut */
+        WhatIfWeekOut: {
+            /** Week */
+            week: number;
+            /** Label */
+            label: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Base Closing Cents */
+            base_closing_cents: number;
+            /** Scenario Closing Cents */
+            scenario_closing_cents: number;
+            /** Change Cents */
+            change_cents: number;
+            /** Base Below Buffer */
+            base_below_buffer: boolean;
+            /** Scenario Below Buffer */
+            scenario_below_buffer: boolean;
         };
     };
     responses: never;
@@ -1428,6 +1613,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResetOut"];
+                };
+            };
+        };
+    };
+    whatif_whatif_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatIfIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatIfOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -87,7 +87,7 @@ Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so f
   seed/            generate_golden.py, golden/ (generated CSVs + JSON)
   tests/
 /frontend
-  app/  dashboard, transactions, insights, chat, approvals, audit, upload, memo
+  app/  dashboard, transactions, insights, chat, approvals, audit, upload, memo, what-if
 /docs
   architecture.md, threat-model.md, security-assessment.md, phases/
 SPEC.md  CLAUDE.md  README.md
@@ -235,6 +235,7 @@ Fictional vendor names only (no real brands).
 - `/audit` — event list + "Verify chain" button
 - `/upload` — CSV upload with preview
 - `/memo` — weekly CFO memo
+- `/what-if` — before/after 13-week forecast for a scenario (from a chat what-if or the cash-gap card); scenario inputs shown as assumptions, never as verified figures; financing comparison for the base gap and the gap left after the scenario. Owner/accountant (viewers: READ only)
 
 Seeded demo users: owner@emberoak.demo, accountant@emberoak.demo, viewer@emberoak.demo.
 
