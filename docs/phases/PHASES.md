@@ -82,6 +82,7 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - Deploy (Vercel + Render/Railway + Supabase), README with setup/deploy/tests.
 - `docs/architecture.md`, `docs/security-assessment.md` (from threat model), evidence export JSONL.
 - Deck + demo video (script: P1 → P2 → P3 → P4 → A1 → audit verify).
+- **Demo reset.** Judges sign in as the public demo owner and approve things, so the deployed instance needs a way back to the golden state. Pick one in the Phase 7 plan: an owner-only "Reset demo data" action (audited), or an automatic reset every few hours on the deployed instance. Either way the reset restores business data (transactions, invoices, insights, actions, sandbox rows) from the golden seed and never deletes or rewrites AuditEvents: the chain stays append-only, gains a `demo_reset` event, and `/audit/verify` still passes afterwards. It is a maintenance path outside ActionService, so it must be the only code that clears Sandbox* tables, and it needs a test for both properties.
 - **Submit by Oct 20 evening Seoul time, not at the deadline.**
 
 **Cut order if behind:** on-chain bonus → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.
