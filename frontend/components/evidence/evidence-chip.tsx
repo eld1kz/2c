@@ -23,6 +23,15 @@ const NOT_STORED = "A simulation from this conversation, not a stored record.";
 
 export type Evidence = { ref: string; label: string | null };
 
+/** A readable name for refs the server has no label for (computed results such as what-ifs). */
+export function fallbackLabel(ref: string): string {
+  const [kind, id] = ref.split(":");
+  if (kind === "whatif") return `What-if ${id}`;
+  if (kind === "forecast_week") return `Week ${id}`;
+  if (kind === "financing") return "Financing option";
+  return ref;
+}
+
 /** A cited record; opens it in the evidence sheet. `valid: false` marks a citation the server could not verify. */
 export function EvidenceChip({ evidence, valid = true, className }: { evidence: Evidence; valid?: boolean; className?: string }) {
   const sheet = useEvidence();
@@ -38,7 +47,7 @@ export function EvidenceChip({ evidence, valid = true, className }: { evidence: 
   const body = (
     <>
       <Icon className="size-3 shrink-0" />
-      <span className="truncate">{evidence.label ?? evidence.ref}</span>
+      <span className="truncate">{evidence.label ?? fallbackLabel(evidence.ref)}</span>
       {!valid && <span className="shrink-0">unverified</span>}
     </>
   );

@@ -38,6 +38,8 @@ export const EVENT: Record<string, string> = {
   upload_rejected: "Bank statement rejected",
   upload_forbidden: "Upload refused: not allowed for this role",
   transaction_recategorized: "Transaction category changed",
+  demo_reset: "Demo data reset",
+  demo_reset_forbidden: "Demo reset refused: owner only",
   recategorize_forbidden: "Category change refused: not allowed for this role",
   recategorize_not_found: "Category change refused: unknown transaction",
 };

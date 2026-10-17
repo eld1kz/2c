@@ -32,6 +32,8 @@ export function ToolTrail({ items, working }: { items: TrailItem[]; working: boo
   return (
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-3" aria-label="Steps">
       {items.map((item, i) => {
+        const prev = items[i - 1];
+        if (item.kind === "tool" && prev?.kind === "action" && prev.action.tool === item.name) return null; // already shown as the proposal
         if (item.kind === "tool") {
           return (
             <li key={i} className="flex items-center gap-1">
