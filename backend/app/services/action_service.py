@@ -39,6 +39,7 @@ from app.policy.tiers import (
     EXECUTE_PARAMS,
     SchedulePaymentParams,
     SendReminderParams,
+    SendTermsRequestParams,
     SubmitLoanApplicationParams,
     tier_of,
 )
@@ -231,6 +232,12 @@ class ActionService:
                                           draft.result["body"], now)
                 return {"sandbox_email_id": email.id, "to_counterparty_id": customer.id, "invoice_id": invoice.id,
                         "status": email.status.value}
+            case SendTermsRequestParams():
+                draft = self.session.get(Action, params.draft_id)
+                supplier = self.session.get(Counterparty, params.counterparty_id)
+                email = outbox.send_email(self.session, action, supplier, draft.result["subject"],
+                                          draft.result["body"], now)
+                return {"sandbox_email_id": email.id, "to_counterparty_id": supplier.id, "status": email.status.value}
             case SubmitLoanApplicationParams():
                 business = self.session.get(Business, action.business_id)
                 application = loans.submit_application(self.session, action, params, business.base_currency, now)
@@ -283,7 +290,7 @@ class ActionService:
 
     def record_terms_draft(self, actor: Actor, counterparty_id: int, extension_days: int) -> Action:
         """draft_terms_request: a templated supplier payment-terms request, stored as an executed
-        SUGGEST action. It is a draft only; no tool sends it."""
+        SUGGEST action. It is a draft only; send_terms_request (EXECUTE, approved by an owner) sends it."""
         self._check_draft(actor, "draft_terms_request")
         supplier = self.session.get(Counterparty, counterparty_id)
         if (supplier is None or supplier.business_id != actor.business_id

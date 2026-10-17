@@ -56,6 +56,7 @@ from app.policy.tiers import (
     TOOL_TIERS,
     SchedulePaymentParams,
     SendReminderParams,
+    SendTermsRequestParams,
     SubmitLoanApplicationParams,
 )
 from app.services import ledger
@@ -78,6 +79,9 @@ INSTRUCTION_LIKE = re.compile(
     re.IGNORECASE)
 CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 NOT_SENT = "Draft only: nothing has been sent and no tool sends it on its own."
+REMINDER_NEXT = "Use send_reminder with this draft_id to propose sending it; a human approves before it goes out."
+TERMS_NEXT = ("Use send_terms_request with this draft_id to propose emailing it to the supplier's stored contact; "
+              "an owner approves before it goes out. Do not tell the user to send it themselves.")
 AWAITING = "Awaiting human approval in the approvals inbox. You cannot approve it."
 DENIED = "The policy gate denied this proposal. Tell the user the reason; do not retry with changed figures."
 
@@ -184,6 +188,10 @@ class _Proposal(BaseModel):
 
 
 class SendReminderIn(SendReminderParams, _Proposal):
+    pass
+
+
+class SendTermsRequestIn(SendTermsRequestParams, _Proposal):
     pass
 
 
@@ -415,12 +423,12 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
 def _draft_reminder(ctx: ToolContext, p: DraftReminderIn) -> dict[str, Any]:
     draft = ctx.service.record_draft(actor_for(ctx.user, via_agent=True), p.invoice_id, p.tone)
     return {**ledger.action_dict(draft), "draft_id": draft.id, "outstanding_cents": draft.result["outstanding"],
-            "note": NOT_SENT}
+            "note": NOT_SENT, "next_step": REMINDER_NEXT}
 
 
 def _draft_terms_request(ctx: ToolContext, p: TermsRequestIn) -> dict[str, Any]:
     draft = ctx.service.record_terms_draft(actor_for(ctx.user, via_agent=True), p.counterparty_id, p.extension_days)
-    return {**ledger.action_dict(draft), "draft_id": draft.id, "note": NOT_SENT}
+    return {**ledger.action_dict(draft), "draft_id": draft.id, "note": NOT_SENT, "next_step": TERMS_NEXT}
 
 
 def _draft_cfo_memo(ctx: ToolContext, _: NoInput) -> dict[str, Any]:
@@ -451,7 +459,8 @@ def _propose(ctx: ToolContext, tool: str, raw: dict[str, Any]) -> tuple[dict[str
     index = ctx.memory.index
     claimed = raw.get("evidence_ids") if isinstance(raw.get("evidence_ids"), list) else []
     targets = [f"{kind}:{params[key]}" for key, kind in (("invoice_id", "invoice"), ("payee_counterparty_id",
-               "counterparty"), ("draft_id", "action")) if isinstance(params.get(key), int)]
+               "counterparty"), ("counterparty_id", "counterparty"), ("draft_id", "action"))
+               if isinstance(params.get(key), int)]
     evidence = [e for e in claimed if isinstance(e, str) and (e in index.seen or e in index.computed)]
     evidence = list(dict.fromkeys([*targets, *evidence]))[:MAX_EVIDENCE_IDS]
     digest = hashlib.sha256(json.dumps([ctx.memory.conversation_id, tool, params], sort_keys=True, default=str)
@@ -517,12 +526,16 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
              "the draft (draft_id); nothing is sent. Use send_reminder to propose sending it.",
              DraftReminderIn, _draft_reminder),
     ToolSpec("draft_terms_request", "Draft a request asking a supplier for more days on payment terms, from a "
-             "fixed template. A draft only; it is never sent by any tool.", TermsRequestIn, _draft_terms_request),
+             "fixed template. Returns the draft (draft_id); nothing is sent. Use send_terms_request to propose "
+             "sending it.", TermsRequestIn, _draft_terms_request),
     ToolSpec("draft_cfo_memo", "Facts for this week's CFO memo: cash, the gap, top insights, pending approvals.",
              NoInput, _draft_cfo_memo),
     ToolSpec("send_reminder", "Propose emailing a reminder draft (from draft_reminder) to the customer's stored "
              "address. Creates a proposal that a human must approve; it does not send anything.",
              SendReminderIn, None),
+    ToolSpec("send_terms_request", "Propose emailing a terms-request draft (from draft_terms_request) to the "
+             "supplier's stored address. Creates a proposal that the owner must approve; it does not send anything.",
+             SendTermsRequestIn, None),
     ToolSpec("schedule_payment", "Propose paying an open payable invoice of an existing, allowlisted "
              "counterparty, by ids only; amount in integer cents. Payment always goes to the counterparty's stored "
              "details. Creates a proposal that a human must approve.", SchedulePaymentIn, None),

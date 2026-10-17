@@ -16,6 +16,7 @@ const STEP: Record<string, string> = {
   draft_terms_request: "Drafted a terms request",
   draft_cfo_memo: "Drafted the CFO memo",
   send_reminder: "Proposed a reminder",
+  send_terms_request: "Proposed a terms request",
   schedule_payment: "Proposed a payment",
   submit_loan_application: "Proposed a loan application",
 };

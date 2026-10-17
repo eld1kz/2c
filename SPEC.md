@@ -172,8 +172,8 @@ Sandbox catalog: overdraft (APR), invoice factoring (advance %, fee per 30d), sh
 | Tier | Tool | Notes |
 |---|---|---|
 | READ | `get_cash_position`, `get_ledger(filters)`, `get_forecast`, `get_insights`, `explain_record(id)` | auto |
-| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_cfo_memo()` | auto; outputs are drafts (`draft_terms_request`: supplier payment-terms request, never sent by itself) |
-| EXECUTE | `send_reminder(invoice_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
+| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_cfo_memo()` | auto; outputs are drafts, never sent by themselves (`draft_terms_request`: supplier payment-terms request from a fixed template) |
+| EXECUTE | `send_reminder(invoice_id, draft_id)`, `send_terms_request(counterparty_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
 
 The agent has **no** approve tool. Approvals come only from an authenticated human via API.
 
@@ -193,6 +193,7 @@ The agent has **no** approve tool. Approvals come only from an authenticated hum
   - amount ≤ `max_single_payment` (default $5,000).
   The tool takes no payee name or bank/account fields; execution always uses the counterparty's stored details. No new beneficiary or bank details are ever accepted from documents.
 - `send_reminder`: max 1 per invoice per `reminder_cooldown_days` (7).
+- `send_terms_request(counterparty_id, draft_id)` — owner only; DENY unless the counterparty is a supplier of this business with a stored `contact_email`, the draft is a `draft_terms_request` for that supplier and at most `reminder_cooldown_days` old, and no terms request went to that supplier within `reminder_cooldown_days`. The email is the draft's fixed-template text (the LLM only picks `extension_days`), sent to the supplier's stored address via the sandbox outbox.
 - Idempotency key per action; re-execution returns original result.
 - Viewer role: READ only. Accountant: READ/SUGGEST + reminders. Owner: all + approvals.
 - Every tool call, proposal, decision, execution, denial → AuditEvent. `hash = sha256(prev_hash + canonical_json(event))`. `GET /audit/verify` recomputes the chain.

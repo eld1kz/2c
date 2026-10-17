@@ -33,14 +33,18 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
 
     def send(messages: list[dict]) -> list:
         draft = tool_result(messages, "draft_reminder")["data"]["draft_id"]
+        terms = tool_result(messages, "draft_terms_request")["data"]["draft_id"]
         insights["late"] = tool_result(messages, "get_insights")["data"]["insights"][0]["ref"]
         return [("send_reminder", {"invoice_id": inv, "draft_id": draft,
                                    "rationale": "INV-1042 is 45 days overdue; collecting it shrinks the cash gap.",
-                                   "evidence_ids": [f"invoice:{inv}", insights["late"], "whatif:1", "made:up"]})]
+                                   "evidence_ids": [f"invoice:{inv}", insights["late"], "whatif:1", "made:up"]}),
+                ("send_terms_request", {"counterparty_id": verde, "draft_id": terms,
+                                        "rationale": "Verde's +30 days covers the gap left after INV-1042, at no cost.",
+                                        "evidence_ids": ["financing:supplier_terms_extension"]})]
 
     def answer(messages: list[dict]) -> list:
         proposed = tool_result(messages, "send_reminder")["data"]["ref"]
-        terms = tool_result(messages, "draft_terms_request")["data"]["ref"]
+        terms = tool_result(messages, "send_terms_request")["data"]["ref"]
         return [
             f"Cash drops below your $5,000.00 buffer in week 6, closing at −$2,087.67 [[forecast_week:6]], and bottoms "
             f"out at −$2,271.99 in week 9 [[forecast_week:9]] [[{insights['gap']}]]. The main drivers are the "
@@ -52,7 +56,8 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
             f"it costs $0.00 and covers that gap on its own [[financing:supplier_terms_extension]] "
             f"[[counterparty:{verde}]]. An overdraft would cost $42.66 [[financing:overdraft]].\n"
             f"I've prepared: (1) a firm reminder to Harbor Lane for INV-1042, awaiting your approval [[{proposed}]]; "
-            f"(2) a terms-request draft for Verde, a draft only and not sent [[{terms}]]. Not financial advice."]
+            f"(2) a request to Verde for 30 more days on payment terms, awaiting your approval [[{terms}]]. "
+            f"Not financial advice."]
 
     def explain(messages: list[dict]) -> list:
         insights["gap"] = tool_result(messages, "get_insights")["data"]["insights"][0]["ref"]
@@ -75,9 +80,10 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     assert done["iterations"] == 6 == MAX_ITERATIONS and UNVERIFIED_NOTICE not in done["message"]
     labels = {c["ref"]: c["label"] for c in done["citations"]}
     assert labels["forecast_week:6"] == "Week 6 (Nov 5)" and labels["whatif:1"] == "What-if 1"
-    assert [name for name, _ in events if name == "tool"] == ["tool"] * 9
-    (action_event,) = [data for name, data in events if name == "action"]
-    assert action_event["tool"] == "send_reminder" and action_event["status"] == "proposed"
+    assert [name for name, _ in events if name == "tool"] == ["tool"] * 10
+    action_events = [data for name, data in events if name == "action"]
+    assert [(a["tool"], a["status"]) for a in action_events] == [("send_reminder", "proposed"),
+                                                                  ("send_terms_request", "proposed")]
 
     # What the engine returned, as the model saw it.
     msgs = chat.model.requests[-1]["messages"]
@@ -93,10 +99,12 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
     assert options[0]["by_counterparty"][0]["covers_gap_alone"] is True
     assert "financing:overdraft" in tool_result(msgs, "rank_financing")["data"]["gap"]["evidence_ids"]
 
-    # The approvals queue holds exactly the reminder; the drafts are stored but not approvable.
+    # The approvals queue holds the reminder and the terms request; the drafts are stored but not approvable.
     pending = chat.client.get("/actions", params={"status": "proposed"}, headers=owner).json()
-    assert len(pending) == 1
-    (reminder,) = pending
+    reminder, terms_request = sorted(pending, key=lambda a: a["id"])
+    assert (terms_request["tool"], terms_request["params"]["counterparty_id"]) == ("send_terms_request", verde)
+    assert terms_request["display"]["title"] == "Ask Verde Green Coffee Imports for +30 days on payment terms"
+    assert "net 14 to net 44" in terms_request["display"]["email"]["body"]
     assert (reminder["tool"], reminder["tier"], reminder["proposed_by"]) == ("send_reminder", "EXECUTE", "agent")
     assert reminder["params"]["invoice_id"] == inv and "made:up" not in reminder["evidence_ids"]
     assert {f"invoice:{inv}", "whatif:1"} <= set(reminder["evidence_ids"])
@@ -109,16 +117,18 @@ def test_p4_walkthrough(chat: ChatHarness) -> None:
 
     log = chat.events()
     start = log.index("agent_turn_started")
-    assert log[start:].count("agent_tool_called") == 9 and log[start:].count("draft_created") == 2
-    assert log[start:].count("action_proposed") == 1 and log[-1] == "agent_turn_finished"
+    assert log[start:].count("agent_tool_called") == 10 and log[start:].count("draft_created") == 2
+    assert log[start:].count("action_proposed") == 2 and log[-1] == "agent_turn_finished"
     assert chat.client.get("/audit/verify", headers=owner).json()["ok"] is True
 
     # A human approves → the sandbox email goes to the stored address.
-    approved = chat.client.post(f"/actions/{reminder['id']}/approve", headers=owner).json()
-    assert approved["status"] == "executed"
+    for action in (reminder, terms_request):
+        approved = chat.client.post(f"/actions/{action['id']}/approve", headers=owner).json()
+        assert approved["status"] == "executed"
     with chat.factory() as s:
-        (email,) = s.scalars(select(SandboxEmail))
-        assert email.to_address == "ap@harborlane.example"
+        emails = list(s.scalars(select(SandboxEmail).order_by(SandboxEmail.id)))
+        assert [e.to_address for e in emails] == ["ap@harborlane.example", "ar@verdegreen.example"]
+    assert chat.client.get("/audit/verify", headers=owner).json()["ok"] is True
 
 
 def test_system_prompt_is_the_constant_and_tools_follow_the_role(chat: ChatHarness) -> None:

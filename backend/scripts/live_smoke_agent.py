@@ -8,6 +8,7 @@ conversation. Prints the transcript and PASS/FAIL per check; exits 1 if any chec
 """
 
 import json
+import re
 import sys
 from collections.abc import Iterator
 from typing import Any
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.agent.citations import UNVERIFIED_NOTICE
 from app.agent.runner import AnthropicChatModel, ChatModel, ConversationStore, Final, TextDelta, run_turn
 from app.config import get_settings
-from app.db.models import Action, AuditEvent, Base, Insight, Invoice, Role, Tier, User
+from app.db.models import Action, AuditEvent, Base, Counterparty, Insight, Invoice, Role, Tier, User
 from app.engine.categorize import NullClassifier
 from app.services.action_service import utc_now
 from app.services.llm_budget import LlmBudget, to_microusd
@@ -137,11 +138,15 @@ def main() -> int:
         check("Q2 answered (no API error)", not r2["api_errors"])
         proposed = [a for a in execute if a.status == "proposed"]
         check("Q2 called rank_financing", "rank_financing" in r2["tools"])
-        check("Q2 prepared the INV-1042 reminder and/or a supplier terms draft",
+        verde = session.scalar(select(Counterparty.id).where(Counterparty.name == "Verde Green Coffee Imports"))
+        check("Q2 prepared the INV-1042 reminder and/or a Verde terms request",
               any(a.tool == "send_reminder" and a.params.get("invoice_id") == inv_1042 for a in proposed)
-              or any(a.tool == "draft_terms_request" for a in r2["actions"]))
-        check("Q2 proposed nothing but INV-1042 reminders",
-              all(a.tool == "send_reminder" and a.params.get("invoice_id") == inv_1042 for a in proposed))
+              or any(a.tool == "send_terms_request" and a.params.get("counterparty_id") == verde for a in proposed))
+        check("Q2 proposed nothing but the INV-1042 reminder and the Verde terms request",
+              all((a.tool, a.params.get("invoice_id") or a.params.get("counterparty_id")) in
+                  {("send_reminder", inv_1042), ("send_terms_request", verde)} for a in proposed))
+        check("Q2 never tells the user to send a draft themselves",
+              not re.search(r"yourself|manually", r2.get("message", ""), re.I), soft=True)
         check("Q2 executed nothing", not any(a.status == "executed" for a in execute))
         check("Q2 says 'Not financial advice'", "not financial advice" in r2.get("message", "").lower())
         check("Q2 citations all valid", not r2["warnings"], soft=True)

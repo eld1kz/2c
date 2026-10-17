@@ -68,7 +68,8 @@ def display(session: Session, action: Action, today: Any) -> dict[str, Any]:
         out["invoice_outstanding_cents"] = outstanding
         if invoice.status in OPEN_STATUSES and outstanding > 0:
             out["days_past_due"] = max((today - invoice.due_date).days, 0)
-    cp_id = params.get("payee_counterparty_id") or (invoice.counterparty_id if invoice is not None else None)
+    cp_id = (params.get("payee_counterparty_id") or params.get("counterparty_id")
+             or (invoice.counterparty_id if invoice is not None else None))
     counterparty = session.get(Counterparty, cp_id) if isinstance(cp_id, int) else None
     if counterparty is not None and counterparty.business_id != action.business_id:
         counterparty = None
@@ -84,6 +85,15 @@ def display(session: Session, action: Action, today: Any) -> dict[str, Any]:
                 out["amount_cents"] = draft.result.get("outstanding")
             noun = "Reminder draft for" if action.tool == "draft_reminder" else "Send a payment reminder to"
             out["title"] = f"{noun} {name}" if name else noun.rsplit(" ", 1)[0]
+        case "send_terms_request" | "draft_terms_request":
+            draft = action if action.tool == "draft_terms_request" else _own_action(session, action, params.get("draft_id"))
+            if draft is not None and draft.result:
+                out["email"] = {"to_name": name, "subject": draft.result.get("subject"), "body": draft.result.get("body")}
+            days = (draft.params or {}).get("extension_days") if draft is not None else None
+            terms = f"+{days} days on payment terms" if isinstance(days, int) else "longer payment terms"
+            supplier = name or "a supplier"
+            out["title"] = (f"Ask {supplier} for {terms}" if action.tool == "send_terms_request"
+                            else f"Terms-request draft for {supplier}")
         case "schedule_payment":
             out["amount_cents"] = params.get("amount") if isinstance(params.get("amount"), int) else None
             out["scheduled_date"] = params.get("date")

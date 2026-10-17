@@ -43,7 +43,8 @@ def _sandbox_rows(demo: Demo) -> int:
 
 
 def test_registry_matches_the_tier_table() -> None:
-    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 13
+    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 14
+    assert TOOLS["send_terms_request"].tier == Tier.EXECUTE
     assert TOOLS["draft_terms_request"].tier == Tier.SUGGEST
     assert [n for n, s in TOOLS.items() if s.tier == Tier.READ] == READ
     assert [n for n, s in TOOLS.items() if s.tier == Tier.SUGGEST] == SUGGEST

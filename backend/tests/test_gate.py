@@ -111,6 +111,29 @@ def test_reminder_rules(demo: Demo) -> None:
     assert _check(demo, "send_reminder", ok)[1] == "customer has no stored contact email"
 
 
+def test_terms_request_rules(demo: Demo) -> None:
+    verde, harbor = demo.counterparties["Verde Green Coffee Imports"], demo.counterparties["Harbor Lane Café"]
+    draft = demo.service.record_terms_draft(demo.actor("owner"), verde.id, 30)
+    ok = {"counterparty_id": verde.id, "draft_id": draft.id}
+    assert _check(demo, "send_terms_request", ok) == (Decision.REQUIRE_APPROVAL, "")
+    assert _check(demo, "send_terms_request", ok, "accountant") == (
+        Decision.DENY, "role accountant may not use send_terms_request")  # owner only
+    assert _check(demo, "send_terms_request", ok | {"counterparty_id": harbor.id})[1] == (
+        "counterparty is not a supplier of this business")
+    quickship = demo.counterparties["QuickShip Logistics"].id
+    assert _check(demo, "send_terms_request", ok | {"counterparty_id": quickship})[1] == (
+        "draft is not a terms-request draft for this supplier")
+    reminder = demo.service.record_draft(demo.actor("owner"), demo.invoices["INV-1042"].id, "polite")
+    assert _check(demo, "send_terms_request", ok | {"draft_id": reminder.id})[1] == (
+        "draft is not a terms-request draft for this supplier")
+    assert _check(demo, "send_terms_request", ok | {"to": "x@evil.example"})[1].startswith("invalid parameters")
+    demo.clock.advance(days=8)
+    assert _check(demo, "send_terms_request", ok)[1] == "draft is older than 7 days; draft a new terms request"
+    fresh = demo.service.record_terms_draft(demo.actor("owner"), verde.id, 30)
+    verde.contact_email = None
+    assert _check(demo, "send_terms_request", ok | {"draft_id": fresh.id})[1] == "supplier has no stored contact email"
+
+
 @pytest.mark.parametrize("option,amount,decision", [
     ("overdraft", 1_500_000, Decision.REQUIRE_APPROVAL),
     ("overdraft", 1_500_001, Decision.DENY),
@@ -125,7 +148,9 @@ def test_loan_application_limits(demo: Demo, option: str, amount: int, decision:
 
 def test_every_execute_tool_has_a_closed_schema() -> None:
     execute = {tool for tool, tier in TOOL_TIERS.items() if tier == "EXECUTE"}
-    assert execute == set(EXECUTE_PARAMS) == {"send_reminder", "schedule_payment", "submit_loan_application"}
+    assert execute == set(EXECUTE_PARAMS) == {"send_reminder", "send_terms_request", "schedule_payment",
+                                              "submit_loan_application"}
+    assert set(EXECUTE_PARAMS["send_terms_request"].model_fields) == {"counterparty_id", "draft_id"}
     assert all(model.model_config["extra"] == "forbid" for model in EXECUTE_PARAMS.values())
     assert set(EXECUTE_PARAMS["schedule_payment"].model_fields) == {"payee_counterparty_id", "invoice_id", "amount", "date"}
     assert TOOL_TIERS["draft_terms_request"] == "SUGGEST"

@@ -19,6 +19,7 @@ from app.db.models import (
     Action,
     ActionStatus,
     Counterparty,
+    CounterpartyKind,
     Invoice,
     InvoiceDirection,
     Policy,
@@ -31,11 +32,13 @@ from app.policy.tiers import (
     EXECUTE_PARAMS,
     SchedulePaymentParams,
     SendReminderParams,
+    SendTermsRequestParams,
     SubmitLoanApplicationParams,
     tier_of,
 )
 
 DRAFT_TOOL = "draft_reminder"
+TERMS_DRAFT_TOOL = "draft_terms_request"
 MAX_PAYMENT_LEAD_DAYS = 90  # payment date must be within [DEMO_TODAY, +90 days]
 
 
@@ -108,6 +111,8 @@ def check(action: ActionRequest, actor: Actor, ctx: GateContext) -> GateResult:
             return _schedule_payment(action.business_id, params, ctx, action.action_id)
         case SendReminderParams():
             return _send_reminder(action.business_id, params, ctx)
+        case SendTermsRequestParams():
+            return _send_terms_request(action.business_id, params, ctx)
         case SubmitLoanApplicationParams():
             return _loan_application(action.business_id, params, ctx)
     return deny(f"no gate rule for {action.tool}")  # pragma: no cover
@@ -165,6 +170,31 @@ def _send_reminder(business_id: int, p: SendReminderParams, ctx: GateContext) ->
     )
     if any(a.params.get("invoice_id") == invoice.id for a in recent):
         return deny(f"a reminder for this invoice was sent within {ctx.policy.reminder_cooldown_days} days")
+    return APPROVAL
+
+
+def _send_terms_request(business_id: int, p: SendTermsRequestParams, ctx: GateContext) -> GateResult:
+    supplier = ctx.session.get(Counterparty, p.counterparty_id)
+    if (supplier is None or supplier.business_id != business_id
+            or supplier.kind not in (CounterpartyKind.supplier, CounterpartyKind.both)):
+        return deny("counterparty is not a supplier of this business")
+    draft = ctx.session.get(Action, p.draft_id)
+    if (draft is None or draft.business_id != business_id or draft.tool != TERMS_DRAFT_TOOL
+            or draft.status != ActionStatus.executed or draft.params.get("counterparty_id") != supplier.id):
+        return deny("draft is not a terms-request draft for this supplier")
+    # The draft names a start date and the supplier's payment record: refuse to send a stale one.
+    drafted_at = datetime.fromisoformat(draft.result["drafted_at"])
+    if ctx.now - drafted_at > timedelta(days=ctx.policy.reminder_cooldown_days):
+        return deny(f"draft is older than {ctx.policy.reminder_cooldown_days} days; draft a new terms request")
+    if not supplier.contact_email:
+        return deny("supplier has no stored contact email")
+    since = ctx.now - timedelta(days=ctx.policy.reminder_cooldown_days)
+    recent = ctx.session.scalars(
+        select(Action).join(SandboxEmail, SandboxEmail.action_id == Action.id)
+        .where(Action.business_id == business_id, Action.tool == "send_terms_request", SandboxEmail.sent_at >= since)
+    )
+    if any(a.params.get("counterparty_id") == supplier.id for a in recent):
+        return deny(f"a terms request to this supplier was sent within {ctx.policy.reminder_cooldown_days} days")
     return APPROVAL
 
 

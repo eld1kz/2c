@@ -122,6 +122,32 @@ def test_accountant_approves_reminders_but_not_payments(demo: Demo) -> None:
     assert "INV-1042" in email.subject and "45 days past due" in email.body and "$4,800.00" in email.body
 
 
+def test_terms_request_is_sent_once_to_the_suppliers_stored_contact(demo: Demo) -> None:
+    verde = demo.counterparties["Verde Green Coffee Imports"]
+    draft = demo.service.record_terms_draft(demo.actor("owner"), verde.id, 30)
+    params = {"counterparty_id": verde.id, "draft_id": draft.id}
+    denied = demo.service.propose(demo.actor("accountant"), "send_terms_request", params, idempotency_key="t-acc")
+    assert denied.status == "denied"  # owner only
+    action = demo.service.propose(demo.actor("owner"), "send_terms_request", params, idempotency_key="terms-1")
+    assert action.status == "proposed"
+    with pytest.raises(Forbidden):
+        demo.service.approve(demo.users["accountant"], action.id)
+    action = demo.service.approve(demo.users["owner"], action.id)
+    (email,) = demo.session.scalars(select(SandboxEmail))
+    assert action.status == "executed" and action.result["sandbox_email_id"] == email.id
+    assert email.to_address == "ar@verdegreen.example"
+    assert (email.subject, email.body) == (draft.result["subject"], draft.result["body"])
+    assert "net 14 to net 44" in email.body
+    assert demo.service.execute(demo.users["owner"], action.id).result == action.result  # A4: replay
+    assert demo.session.scalar(select(func.count()).select_from(SandboxEmail)) == 1
+
+    # Cooldown: a second request to the same supplier within 7 days is denied.
+    again = demo.service.record_terms_draft(demo.actor("owner"), verde.id, 30)
+    second = demo.service.propose(demo.actor("owner"), "send_terms_request",
+                                  {"counterparty_id": verde.id, "draft_id": again.id}, idempotency_key="terms-2")
+    assert second.status == "denied" and "within 7 days" in second.result["denied"]
+
+
 def test_reject_then_cannot_execute(demo: Demo) -> None:
     action = demo.service.reject(demo.users["owner"], _pay_verde(demo).id)
     assert action.status == "rejected"

@@ -1,7 +1,8 @@
 """Tool → permission tier (SPEC §7) and the parameter schemas of EXECUTE tools.
 
 EXECUTE parameters are strict and closed (`extra="forbid"`): `schedule_payment` cannot carry a
-payee name, beneficiary or bank/account field, so nothing from a document can introduce one.
+payee name, beneficiary or bank/account field, so nothing from a document can introduce one; the two
+email tools take a record id and a draft id only, never an address, subject or body.
 """
 
 from datetime import date
@@ -22,6 +23,7 @@ TOOL_TIERS: dict[str, Tier] = {
     "draft_terms_request": Tier.SUGGEST,
     "draft_cfo_memo": Tier.SUGGEST,
     "send_reminder": Tier.EXECUTE,
+    "send_terms_request": Tier.EXECUTE,
     "schedule_payment": Tier.EXECUTE,
     "submit_loan_application": Tier.EXECUTE,
 }
@@ -34,6 +36,11 @@ class _Closed(BaseModel):
 class SendReminderParams(_Closed):
     invoice_id: StrictInt
     draft_id: StrictInt
+
+
+class SendTermsRequestParams(_Closed):
+    counterparty_id: StrictInt  # the supplier; the email goes to its stored contact_email
+    draft_id: StrictInt  # a draft_terms_request for that supplier (fixed template)
 
 
 class SchedulePaymentParams(_Closed):
@@ -50,6 +57,7 @@ class SubmitLoanApplicationParams(_Closed):
 
 EXECUTE_PARAMS: dict[str, type[_Closed]] = {
     "send_reminder": SendReminderParams,
+    "send_terms_request": SendTermsRequestParams,
     "schedule_payment": SchedulePaymentParams,
     "submit_loan_application": SubmitLoanApplicationParams,
 }
