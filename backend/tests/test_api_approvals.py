@@ -77,3 +77,47 @@ def test_viewer_sees_the_card_but_cannot_approve(client: TestClient, db) -> None
     assert r.status_code == 403
     [card] = client.get("/actions", params={"status": "proposed"}, headers=_login(client, "viewer")).json()
     assert card["id"] == action["id"]
+
+
+def test_action_chips_are_named_like_the_approval_cards(client: TestClient, db) -> None:  # noqa: F811, ANN001
+    ids = _ids(db)
+    with db() as s:
+        owner = s.scalar(select(User).where(User.email == "owner@emberoak.demo"))
+        service, actor = ActionService(s, get_settings().demo_today), actor_for(owner)
+        reminder_draft = service.record_draft(actor, ids["INV-1042"], Tone.firm)
+        terms_draft = service.record_terms_draft(actor, ids["Verde Green Coffee Imports"], 30)
+        actions = {
+            "reminder": service.propose(actor, "send_reminder", {"invoice_id": ids["INV-1042"],
+                                                                 "draft_id": reminder_draft.id}, idempotency_key="c1"),
+            "terms": service.propose(actor, "send_terms_request", {"counterparty_id": ids["Verde Green Coffee Imports"],
+                                                                   "draft_id": terms_draft.id}, idempotency_key="c2",
+                                     evidence_ids=(f"action:{terms_draft.id}",)),
+            "payment": service.propose(actor, "schedule_payment", {
+                "payee_counterparty_id": ids["QuickShip Logistics"], "invoice_id": ids["QS-2291"], "amount": 46_500,
+                "date": "2026-10-08"}, idempotency_key="c3"),
+            "loan": service.propose(actor, "submit_loan_application", {"option_id": "overdraft", "amount": 100_000},
+                                    idempotency_key="c4"),
+            "reminder_draft": reminder_draft,
+            "terms_draft": terms_draft,
+        }
+        refs = {k: f"action:{a.id}" for k, a in actions.items()}
+        s.commit()
+    headers = _login(client, "viewer")
+    rows = client.get("/records", params={"ref": list(refs.values())}, headers=headers).json()
+    labels = {r["ref"]: r["label"] for r in rows}
+    assert {k: labels[r] for k, r in refs.items()} == {
+        "reminder": "Reminder to Harbor Lane Café",
+        "terms": "Terms request to Verde Green Coffee Imports",
+        "payment": "Payment to QuickShip Logistics",
+        "loan": "Sandbox overdraft application",
+        "reminder_draft": "Reminder draft for Harbor Lane Café",
+        "terms_draft": "Terms-request draft for Verde Green Coffee Imports",
+    }
+    # The cards keep their longer titles, from the same helper and the same counterparty.
+    cards = {a["id"]: a["display"]["title"] for a in client.get("/actions", headers=_login(client, "owner")).json()}
+    assert cards[int(refs["terms"].split(":")[1])] == "Ask Verde Green Coffee Imports for +30 days on payment terms"
+    assert cards[int(refs["payment"].split(":")[1])] == "Pay QuickShip Logistics"
+    # The terms request's evidence chip for its draft reads as a draft, not "Action #N · draft_terms_request".
+    terms_card = next(a for a in client.get("/actions", headers=headers).json() if f"action:{a['id']}" == refs["terms"])
+    assert {"ref": refs["terms_draft"], "label": "Terms-request draft for Verde Green Coffee Imports"} in \
+        terms_card["display"]["evidence"]

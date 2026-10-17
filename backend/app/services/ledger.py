@@ -31,6 +31,7 @@ from app.db.models import (
     Transaction,
 )
 from app.policy.limits import OPEN_STATUSES, invoice_outstanding
+from app.services import action_names
 
 MAX_ROWS = 50
 MAX_SERIES_EVIDENCE = 12
@@ -281,6 +282,11 @@ def record_exists(session: Session, business_id: int, record_ref: str) -> bool:
     return row is not None and row.business_id == business_id
 
 
+def _action_label(session: Session, action: Action) -> str:
+    cp = action_names.counterparty(session, action)
+    return action_names.chip_label(action, cp.name if cp is not None else None)
+
+
 def labels(session: Session, business_id: int, refs: list[str]) -> dict[str, str]:
     """Short display labels for "type:id" refs of this business (e.g. invoice → its number).
 
@@ -312,7 +318,7 @@ def labels(session: Session, business_id: int, refs: list[str]) -> dict[str, str
     for s in series:
         out[f"recurring_series:{s.id}"] = f"{names.get(s.counterparty_id, 'Series')} · {s.cadence.value}"
     simple = {"invoice": (Invoice, lambda i: i.number), "account": (Account, lambda a: a.name),
-              "insight": (Insight, lambda i: i.title), "action": (Action, lambda a: f"Action #{a.id} · {a.tool}")}
+              "insight": (Insight, lambda i: i.title), "action": (Action, lambda a: _action_label(session, a))}
     for kind, (model, label) in simple.items():
         if kind in ids:
             for row in session.scalars(select(model).where(model.business_id == business_id, model.id.in_(ids[kind]))):
