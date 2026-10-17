@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   outputDir: "e2e/.results",
+  globalTimeout: 10 * 60_000, // a hung browser or worker ends the run instead of stalling it
   use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000", channel: "chrome" },
   projects: [
     { name: "phone", use: { ...devices["iPhone 13"], defaultBrowserType: "chromium", channel: "chrome" } },

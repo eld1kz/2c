@@ -35,10 +35,13 @@ class ScriptedModel:
         self._ids = 0
         self.usage = usage  # a runner.Usage billed for every call (default: none)
         self.model = model
+        self.timeouts: list[float] = []  # the `timeout` each call was given
 
-    def stream(self, *, system: str, tools: list[dict], messages: list[dict], tool_choice: dict):  # noqa: ANN201
+    def stream(self, *, system: str, tools: list[dict], messages: list[dict], tool_choice: dict,  # noqa: ANN201
+               timeout: float):
         from app.agent.runner import Final, TextDelta
 
+        self.timeouts.append(timeout)
         self.requests.append(copy.deepcopy({"system": system, "tools": [t["name"] for t in tools],
                                             "messages": messages, "tool_choice": tool_choice}))
         step = self.steps.pop(0) if self.steps else ["Okay."]

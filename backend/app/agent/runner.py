@@ -4,11 +4,14 @@ At most MAX_ITERATIONS (6) model calls per turn; the last one is made with tool_
 model must answer with what it has. Tool calls go through agent.tools.dispatch (audited, committed
 one by one, so proposals and audit events survive a dropped stream). The final answer is checked
 by agent.citations; one failed check gets one rewrite, after which the answer is shown with its
-unverified figures flagged. Conversations live in server memory only: the client never sends
+unverified figures flagged. Time is bounded twice: each API attempt times out after CALL_SECONDS with
+at most CALL_RETRIES retry, and the whole turn stops after TURN_SECONDS with an audited
+`agent_turn_timeout` and a clean error event (the chat lock is released as for any finished turn). Conversations live in server memory only: the client never sends
 history, so it cannot forge tool results.
 """
 
 import threading
+import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import asdict, astuple, dataclass, field
@@ -41,6 +44,12 @@ UNAVAILABLE = ("The assistant is unavailable right now. Anything already propose
 STEP_LIMIT = "I stopped after the maximum number of steps for one question; ask me to continue if needed."
 CUT_OFF = "(The answer was cut off.)"
 REFUSED = "I can't help with that request."
+TURN_SECONDS = 120.0  # wall-clock limit for one whole turn (every model call and tool call)
+CALL_SECONDS = 60.0  # per attempt of one model API request
+CALL_RETRIES = 1  # the SDK retries a failed or timed-out attempt at most once
+TIMED_OUT = ("This answer took longer than 2 minutes, so it was stopped. Anything already proposed is still in the "
+             "approvals inbox. Try a narrower question.")
+_monotonic = time.monotonic  # module-level so tests can drive time without sleeping
 
 
 # --- model seam ----------------------------------------------------------------------------
@@ -75,9 +84,15 @@ class ModelUnavailable(Exception):
     pass
 
 
+class ModelTimeout(ModelUnavailable):
+    """The model call ran out of time (API timeout or the turn's deadline)."""
+
+
 class ChatModel(Protocol):
     def stream(self, *, system: str, tools: list[dict[str, Any]], messages: list[dict[str, Any]],
-               tool_choice: dict[str, Any]) -> Iterator[TextDelta | Final]: ...
+               tool_choice: dict[str, Any], timeout: float) -> Iterator[TextDelta | Final]:
+        """`timeout`: seconds this call may take in total, retries included; raise ModelTimeout past it."""
+        ...
 
 
 class AnthropicChatModel:
@@ -87,11 +102,12 @@ class AnthropicChatModel:
 
     @classmethod
     def connect(cls, api_key: str, model: str) -> "AnthropicChatModel":
-        return cls(anthropic.Anthropic(api_key=api_key, max_retries=2), model)
+        return cls(anthropic.Anthropic(api_key=api_key, max_retries=CALL_RETRIES, timeout=CALL_SECONDS), model)
 
     def stream(self, *, system: str, tools: list[dict[str, Any]], messages: list[dict[str, Any]],
-               tool_choice: dict[str, Any]) -> Iterator[TextDelta | Final]:
+               tool_choice: dict[str, Any], timeout: float) -> Iterator[TextDelta | Final]:
         cached_tools = [*tools[:-1], {**tools[-1], "cache_control": {"type": "ephemeral"}}] if tools else tools
+        end = _monotonic() + timeout
         try:
             with self.client.messages.stream(  # cached: tools + system (shared) and the conversation so far
                 model=self.model,
@@ -101,11 +117,16 @@ class AnthropicChatModel:
                 tools=cached_tools,
                 tool_choice=tool_choice,
                 messages=messages,
+                timeout=min(CALL_SECONDS, timeout / (1 + CALL_RETRIES)),  # per attempt: retries fit in `timeout`
             ) as stream:
-                for event in stream:
+                for event in stream:  # a slow trickle of events can't outlast the call's budget either
+                    if _monotonic() > end:
+                        raise ModelTimeout("deadline")
                     if event.type == "text":
                         yield TextDelta(event.text)
                 message = stream.get_final_message()
+        except anthropic.APITimeoutError as e:
+            raise ModelTimeout(type(e).__name__) from e
         except anthropic.APIError as e:
             raise ModelUnavailable(type(e).__name__) from e
         u = message.usage
@@ -223,8 +244,20 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
     usage = Usage()
     max_call_output = 0
     iterations = 0
+    deadline = _monotonic() + TURN_SECONDS
+
+    def timed_out() -> Iterator[dict[str, Any]]:
+        audit.append(session, actor_for(user, via_agent=True).label, "agent_turn_timeout",
+                     {**base, "iteration": iterations, "limit_seconds": TURN_SECONDS, "action_ids": action_ids},
+                     now=clock())
+        session.commit()
+        yield _event("error", message=TIMED_OUT, action_ids=action_ids)
+
     for iterations in range(1, MAX_ITERATIONS + 1):
         last = iterations == MAX_ITERATIONS
+        if _monotonic() >= deadline:  # history is well formed here: it ends with the question or tool results
+            yield from timed_out()
+            return
         if budget is not None and budget.exhausted():  # checked before every call, not only per turn
             audit.append(session, actor_for(user, via_agent=True).label, "agent_budget_exhausted",
                          {**base, "iteration": iterations, "spent_microusd": budget.spent_today()}, now=clock())
@@ -232,19 +265,28 @@ def run_turn(session: Session, user: User, conversation: Conversation, user_text
             yield _event("error", message=budget.message(), action_ids=action_ids)
             return
         final: Final | None = None
+        call = model.stream(system=system, tools=tools, messages=messages,
+                            tool_choice={"type": "none" if last else "auto"},
+                            timeout=min(CALL_SECONDS * (1 + CALL_RETRIES), deadline - _monotonic()))
         try:
-            for item in model.stream(system=system, tools=tools, messages=messages,
-                                     tool_choice={"type": "none" if last else "auto"}):
+            for item in call:
+                if _monotonic() > deadline:
+                    raise ModelTimeout("turn deadline")
                 if isinstance(item, TextDelta):
                     yield _event("text", delta=item.text)
                 else:
                     final = item
+        except ModelTimeout:  # nothing of this call was kept, so the history stays well formed
+            yield from timed_out()
+            return
         except ModelUnavailable as e:
             audit.append(session, actor_for(user, via_agent=True).label, "agent_error",
                          {**base, "error": str(e)[:100], "iteration": iterations}, now=clock())
             session.commit()
             yield _event("error", message=UNAVAILABLE, action_ids=action_ids)
             return
+        finally:
+            call.close()  # ends the API stream (and its connection) if we stopped reading early
         if final is None:  # pragma: no cover - a model must end with Final
             raise RuntimeError("model stream ended without a final message")
         usage += final.usage

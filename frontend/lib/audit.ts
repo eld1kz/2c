@@ -29,6 +29,7 @@ export const EVENT: Record<string, string> = {
   agent_citation_failed: "Answer had unverified figures",
   agent_error: "Assistant error",
   agent_budget_exhausted: "Assistant stopped: AI budget used up",
+  agent_turn_timeout: "Assistant stopped: took longer than 2 minutes",
   chat_rate_limited: "Chat refused: too many questions",
   chat_refused: "Chat refused",
   chat_budget_exhausted: "Chat refused: AI budget used up",
