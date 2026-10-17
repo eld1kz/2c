@@ -34,7 +34,8 @@ const ASK_BASE = "What's the cheapest way to cover the cash gap? Prepare what yo
 function askFor(r: Schemas["WhatIfOut"] | undefined, leftover: boolean): string {
   const [a, ...rest] = r?.assumptions ?? [];
   if (!leftover || !a || rest.length || a.type !== "collect_receivable" || !a.counterparty_name) return ASK_BASE;
-  return `Assume ${a.counterparty_name} pays ${a.invoice?.label ?? "the invoice"} now. What's the cheapest way to cover the cash gap that's left? Prepare what you recommend for my approval.`;
+  const invoice = a.invoice?.label ?? "the invoice";
+  return `If ${a.counterparty_name} pays ${invoice} now, what's the cheapest way to cover the cash gap that's left? Prepare a reminder that gets ${invoice} paid and the cheapest fix for the rest, for my approval.`;
 }
 
 /** The what-if page: a scenario from the URL, today's forecast next to the scenario, and its assumptions. */

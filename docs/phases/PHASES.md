@@ -75,8 +75,11 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - What-if UI (before/after chart), financing comparison view, weekly CFO memo page (+ optional email send via sandbox outbox).
 - **Optional, only if all above green:** testnet stablecoin settlement of one invoice, recorded as execution evidence.
 
+- **Done (Oct 18):** `/what-if` page (before/after chart and table, scenario inputs boxed as assumptions; reached from the cash-gap card and from chat what-ifs, which also render inline), financing comparison for the base gap and the gap left after a scenario (one click from the what-if result), and `send_terms_request` (EXECUTE, owner-only, gated + audited, sandbox outbox to the supplier's stored contact). This completes the P4 recommendation: the agent proposes the Harbor Lane reminder *and* the Verde terms request; it no longer tells the owner to send the request themselves.
+
 **Acceptance**
 - P4 full flow in UI: gap alert → what-if → ranked financing → proposed action → approve.
+  Verified live and repeatable: `LIVE=1 npx playwright test e2e/live-p4.spec.ts --project=desktop` (cash-gap card → what-if → leftover financing: supplier terms $0 first, overdraft second → chat proposes the reminder + terms request → approve both → two sandbox emails → audit verifies → reset).
 
 ## Phase 7 — Ship  *(Oct 19–20)*
 - Deploy (Vercel + Render/Railway + Supabase), README with setup/deploy/tests.
