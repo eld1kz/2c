@@ -1,0 +1,34 @@
+import { Suspense } from "react";
+
+import { LoginForm } from "@/components/login/login-form";
+
+export const metadata = { title: "Sign in · Ledgerwise" };
+
+export default function LoginPage() {
+  // Demo buttons only when the deployment opts in; the seeded password is public demo data.
+  const demoPassword = process.env.DEMO_PASSWORD ?? null;
+  return (
+    <div className="grid min-h-dvh md:grid-cols-[1fr_1.1fr]">
+      <section className="flex flex-col justify-between bg-ink px-6 py-8 text-white md:px-12 md:py-12">
+        <span className="text-[15px] font-semibold tracking-tight">Ledgerwise</span>
+        <div className="my-10 max-w-md md:my-0">
+          <h1 className="text-[28px] leading-tight font-semibold tracking-tight md:text-[40px]">
+            Know when cash runs short, weeks before it does.
+          </h1>
+          <p className="mt-4 text-[15px] leading-relaxed text-white/70">
+            Every figure comes from your own records and links back to them. Nothing is paid or sent until a person approves it.
+          </p>
+        </div>
+        <p className="hidden text-xs text-white/50 md:block">Demo data: Ember &amp; Oak Coffee Roasters, a fictional business.</p>
+      </section>
+      <section className="flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm">
+          <h2 className="mb-6 text-xl font-semibold tracking-tight">Sign in</h2>
+          <Suspense>
+            <LoginForm demoPassword={demoPassword} />
+          </Suspense>
+        </div>
+      </section>
+    </div>
+  );
+}

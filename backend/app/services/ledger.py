@@ -278,3 +278,42 @@ def record_exists(session: Session, business_id: int, record_ref: str) -> bool:
              "account": Account, "insight": Insight, "action": Action}[kind]
     row = session.get(model, int(raw_id))
     return row is not None and row.business_id == business_id
+
+
+def labels(session: Session, business_id: int, refs: list[str]) -> dict[str, str]:
+    """Short display labels for "type:id" refs of this business (e.g. invoice → its number).
+
+    One query per record type. Refs that are malformed, unknown or another business's are left out.
+    """
+    ids: dict[str, set[int]] = {}
+    for r in refs:
+        kind, _, raw_id = r.partition(":")
+        if kind in REF_TYPES and raw_id.isdigit():
+            ids.setdefault(kind, set()).add(int(raw_id))
+    txs: list[Transaction] = []
+    if "transaction" in ids:
+        txs = list(session.scalars(_business_transactions(business_id).where(Transaction.id.in_(ids["transaction"]))))
+    series: list[RecurringSeries] = []
+    if "recurring_series" in ids:
+        series = list(session.scalars(select(RecurringSeries).where(
+            RecurringSeries.business_id == business_id, RecurringSeries.id.in_(ids["recurring_series"]))))
+    cp_ids = (set(ids.get("counterparty", ())) | {t.counterparty_id for t in txs if t.counterparty_id}
+              | {s.counterparty_id for s in series})
+    names = {c.id: c.name for c in session.scalars(select(Counterparty).where(
+        Counterparty.business_id == business_id, Counterparty.id.in_(cp_ids)))} if cp_ids else {}
+    out: dict[str, str] = {}
+    for c_id in ids.get("counterparty", ()):
+        if c_id in names:
+            out[f"counterparty:{c_id}"] = names[c_id]
+    for t in txs:
+        who = names.get(t.counterparty_id or 0, "Transaction")
+        out[f"transaction:{t.id}"] = f"{who} · {t.date:%b} {t.date.day}"
+    for s in series:
+        out[f"recurring_series:{s.id}"] = f"{names.get(s.counterparty_id, 'Series')} · {s.cadence.value}"
+    simple = {"invoice": (Invoice, lambda i: i.number), "account": (Account, lambda a: a.name),
+              "insight": (Insight, lambda i: i.title), "action": (Action, lambda a: f"Action #{a.id} · {a.tool}")}
+    for kind, (model, label) in simple.items():
+        if kind in ids:
+            for row in session.scalars(select(model).where(model.business_id == business_id, model.id.in_(ids[kind]))):
+                out[f"{kind}:{row.id}"] = label(row)
+    return out
