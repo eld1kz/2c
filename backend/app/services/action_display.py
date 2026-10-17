@@ -6,11 +6,11 @@ invoice, never from the proposer's free text.
 
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Action, Business, Counterparty, Invoice, SandboxEmail, SandboxLoanApplication, SandboxPayment
+from app.db.models import Action, Business, Counterparty, Invoice
 from app.policy.limits import OPEN_STATUSES, invoice_outstanding
+from app.sandbox import records
 from app.services import ledger
 
 LOAN_NAMES = {
@@ -38,23 +38,19 @@ def _own_action(session: Session, action: Action, action_id: Any) -> Action | No
 
 
 def _sandbox(session: Session, action: Action, counterparty_name: str | None) -> dict[str, Any] | None:
-    email = session.scalar(select(SandboxEmail).where(SandboxEmail.action_id == action.id))
-    if email is not None:
-        return {"kind": "email", "id": email.id, "status": email.status.value,
-                "summary": f"Sandbox email #{email.id} {email.status.value} to {counterparty_name or 'the stored contact'}",
-                "subject": email.subject, "at": email.sent_at or email.created_at}
-    payment = session.scalar(select(SandboxPayment).where(SandboxPayment.action_id == action.id))
-    if payment is not None:
-        return {"kind": "payment", "id": payment.id, "status": payment.status.value,
-                "summary": f"Sandbox payment #{payment.id} {payment.status.value} to {counterparty_name or 'the payee'}"
-                           f" for {payment.scheduled_date:%b} {payment.scheduled_date.day}",
-                "subject": None, "at": payment.executed_at or payment.created_at}
-    loan = session.scalar(select(SandboxLoanApplication).where(SandboxLoanApplication.action_id == action.id))
-    if loan is not None:
-        return {"kind": "loan_application", "id": loan.id, "status": loan.status.value,
-                "summary": f"Sandbox loan application #{loan.id} {loan.status.value}",
-                "subject": None, "at": loan.decided_at or loan.created_at}
-    return None
+    row = records.for_action(session, action.id)
+    if row is None:
+        return None
+    match row["kind"]:
+        case "email":
+            summary = f"Sandbox email #{row['id']} {row['status']} to {counterparty_name or 'the stored contact'}"
+        case "payment":
+            on = row.pop("scheduled_date")
+            summary = (f"Sandbox payment #{row['id']} {row['status']} to {counterparty_name or 'the payee'}"
+                       f" for {on:%b} {on.day}")
+        case _:
+            summary = f"Sandbox loan application #{row['id']} {row['status']}"
+    return {**row, "summary": summary}
 
 
 def display(session: Session, action: Action, today: Any) -> dict[str, Any]:
