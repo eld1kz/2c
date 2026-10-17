@@ -277,6 +277,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Transactions */
+        get: operations["list_transactions_transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transactions/{transaction_id}/category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Category */
+        post: operations["set_category_transactions__transaction_id__category_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -405,6 +439,15 @@ export interface components {
         Body_upload_upload_post: {
             /** File */
             file: string;
+        };
+        /**
+         * Category
+         * @enum {string}
+         */
+        Category: "revenue_retail" | "revenue_wholesale" | "cogs_beans" | "cogs_packaging" | "rent" | "utilities" | "payroll" | "software" | "equipment" | "logistics" | "marketing" | "fees" | "taxes" | "transfer" | "other";
+        /** CategoryIn */
+        CategoryIn: {
+            category: components["schemas"]["Category"];
         };
         /** ChatIn */
         ChatIn: {
@@ -704,6 +747,44 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+        };
+        /** TransactionOut */
+        TransactionOut: {
+            /** Ref */
+            ref: string;
+            /** Id */
+            id: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Amount Cents */
+            amount_cents: number;
+            /** Currency */
+            currency: string;
+            category: components["schemas"]["Category"] | null;
+            /** Category Source */
+            category_source: string | null;
+            /** Needs Review */
+            needs_review: boolean;
+            counterparty: components["schemas"]["EvidenceRef"] | null;
+            invoice: components["schemas"]["EvidenceRef"] | null;
+            description: components["schemas"]["UntrustedOut"];
+        };
+        /** TransactionPageOut */
+        TransactionPageOut: {
+            /** Rows */
+            rows: components["schemas"]["TransactionOut"][];
+            /** Has More */
+            has_more: boolean;
+        };
+        /** UntrustedOut */
+        UntrustedOut: {
+            /** Untrusted Text */
+            untrusted_text: string;
+            /** Source */
+            source: string;
         };
         /** UploadOut */
         UploadOut: {
@@ -1226,6 +1307,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transactions_transactions_get: {
+        parameters: {
+            query?: {
+                needs_review?: boolean | null;
+                category?: components["schemas"]["Category"] | null;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_category_transactions__transaction_id__category_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionOut"];
                 };
             };
             /** @description Validation Error */

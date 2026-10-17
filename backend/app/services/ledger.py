@@ -108,7 +108,7 @@ def _business_transactions(business_id: int):  # noqa: ANN202 - a select()
 def query_transactions(session: Session, business_id: int, *, date_from: date | None = None,
                        date_to: date | None = None, category: Category | None = None,
                        counterparty_id: int | None = None, needs_review: bool | None = None,
-                       limit: int = 20) -> list[dict[str, Any]]:
+                       limit: int = 20, offset: int = 0) -> list[dict[str, Any]]:
     query = _business_transactions(business_id)
     if date_from is not None:
         query = query.where(Transaction.date >= date_from)
@@ -120,7 +120,8 @@ def query_transactions(session: Session, business_id: int, *, date_from: date | 
         query = query.where(Transaction.counterparty_id == counterparty_id)
     if needs_review is not None:
         query = query.where(Transaction.needs_review == needs_review)
-    rows = session.scalars(query.order_by(Transaction.date.desc(), Transaction.id.desc()).limit(min(limit, MAX_ROWS)))
+    rows = session.scalars(query.order_by(Transaction.date.desc(), Transaction.id.desc())
+                           .offset(max(offset, 0)).limit(min(limit, MAX_ROWS)))
     return [_transaction(session, t) for t in rows]
 
 

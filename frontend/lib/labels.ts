@@ -1,3 +1,5 @@
+import type { Schemas } from "@/lib/api/client";
+
 // Plain-language names for engine enums.
 
 export const INSIGHT_TYPE: Record<string, string> = {
@@ -43,3 +45,25 @@ export function askAbout(insight: { type: string; title: string }): string {
       return `Explain this and what I should do: ${insight.title}`;
   }
 }
+
+
+/** Every engine category (SPEC §6.2), named for people. `satisfies` makes tsc catch a new backend value. */
+export const CATEGORY = {
+  revenue_retail: "Café sales",
+  revenue_wholesale: "Wholesale sales",
+  cogs_beans: "Green coffee",
+  cogs_packaging: "Packaging",
+  rent: "Rent",
+  utilities: "Utilities",
+  payroll: "Payroll",
+  software: "Software",
+  equipment: "Equipment",
+  logistics: "Shipping",
+  marketing: "Marketing",
+  fees: "Bank and card fees",
+  taxes: "Taxes",
+  transfer: "Transfers",
+  other: "Other",
+} satisfies Record<Schemas["Category"], string>;
+
+export const CATEGORIES = Object.keys(CATEGORY) as Schemas["Category"][];

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type Schemas, unwrap } from "./client";
+import { api, ApiError, detailOf, type Schemas, unwrap } from "./client";
 
 export const keys = {
   me: ["me"],
@@ -98,4 +98,49 @@ export const useAuditEvents = () =>
 
 export function useVerifyChain() {
   return useMutation({ mutationFn: async () => unwrap(await api.GET("/audit/verify")) });
+}
+
+export const useTransactions = (needsReview: boolean, pages: number) =>
+  useQuery({
+    queryKey: ["transactions", needsReview, pages],
+    queryFn: async () => {
+      const rows: Schemas["TransactionOut"][] = [];
+      let hasMore = false;
+      for (let page = 0; page < pages; page++) {
+        const out = unwrap(
+          await api.GET("/transactions", { params: { query: { needs_review: needsReview || undefined, offset: rows.length } } }),
+        );
+        rows.push(...out.rows);
+        hasMore = out.has_more;
+        if (!hasMore) break;
+      }
+      return { rows, hasMore };
+    },
+    placeholderData: (previous) => previous,
+  });
+
+export function useRecategorize() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, category }: { id: number; category: Schemas["Category"] }) =>
+      unwrap(await api.POST("/transactions/{transaction_id}/category", { params: { path: { transaction_id: id } }, body: { category } })),
+    onSuccess: () => {
+      for (const key of [["transactions"], keys.forecast, keys.insights, ["record"]]) void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+export function useUpload() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File): Promise<Schemas["UploadOut"]> => {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/backend/upload", { method: "POST", body: form });
+      const body = await response.json().catch(() => undefined);
+      if (!response.ok) throw new ApiError(response.status, detailOf(body));
+      return body;
+    },
+    onSuccess: () => void queryClient.invalidateQueries(),
+  });
 }

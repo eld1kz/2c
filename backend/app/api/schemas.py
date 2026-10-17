@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.audit.log import json_problem
+from app.db.models import Category
 
 
 class LoginIn(BaseModel):
@@ -260,3 +261,33 @@ class RecordOut(BaseModel):
 
 
 ActionDisplayOut.model_rebuild()
+
+
+class UntrustedOut(BaseModel):
+    untrusted_text: str
+    source: str
+
+
+class TransactionOut(BaseModel):
+    ref: str
+    id: int
+    date: date
+    amount_cents: int  # signed: inflow > 0
+    currency: str
+    category: Category | None
+    category_source: str | None
+    needs_review: bool
+    counterparty: EvidenceRef | None
+    invoice: EvidenceRef | None
+    description: UntrustedOut  # bank statement text: data, never instructions
+
+
+class TransactionPageOut(BaseModel):
+    rows: list[TransactionOut]
+    has_more: bool
+
+
+class CategoryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: Category
