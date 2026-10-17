@@ -96,3 +96,40 @@ def test_simulation_writes_nothing(client: TestClient, db: sessionmaker) -> None
 
 def test_needs_a_signed_in_user(client: TestClient) -> None:  # noqa: F811
     assert client.post("/whatif", json={"scenarios": []}).status_code == 401
+
+
+def test_financing_for_the_gap_left_after_collecting_inv_1042(client: TestClient,  # noqa: F811
+                                                              db: sessionmaker) -> None:  # noqa: F811
+    out = client.post("/financing", json=_collect(_invoice_id(db, "INV-1042")), headers=_login(client, "owner"))
+    assert out.status_code == 200, out.text
+    body = out.json()
+    assert body["based_on"] == "scenario"
+    assert body["gap"]["amount_cents"] == 247_199
+    first, second = body["options"][:2]
+    assert (first["rank"], first["option_id"], first["cost_cents"], first["covers_gap"]) == (
+        1, "supplier_terms_extension", 0, True)
+    assert (second["rank"], second["option_id"], second["covers_gap"]) == (2, "overdraft", True)
+    verde = first["by_counterparty"][0]
+    assert (verde["counterparty"]["label"], verde["covers_gap_alone"]) == ("Verde Green Coffee Imports", True)
+    assert first["evidence"] and all(e["ref"].startswith("invoice:") and e["label"] for e in first["evidence"])
+    assert "Not financial advice" in body["disclaimer"]
+
+
+def test_financing_for_the_base_gap(client: TestClient) -> None:  # noqa: F811
+    body = client.post("/financing", json={}, headers=_login(client, "accountant")).json()
+    assert body["based_on"] == "base"
+    assert body["gap"]["amount_cents"] == 727_199
+    assert [o["option_id"] for o in body["options"]][:2] == ["overdraft", "short_term_loan"]
+    supplier = next(o for o in body["options"] if o["option_id"] == "supplier_terms_extension")
+    assert (supplier["cost_cents"], supplier["covers_gap"]) == (0, False)  # free, but not enough alone
+
+
+def test_no_gap_means_no_options(client: TestClient) -> None:  # noqa: F811
+    body = {"scenarios": [{"type": "one_off", "amount_cents": 2_000_000, "on": "2026-10-01"}]}
+    out = client.post("/financing", json=body, headers=_login(client, "owner")).json()
+    assert (out["gap"], out["options"]) == (None, [])
+
+
+def test_viewer_cannot_rank_financing(client: TestClient, db: sessionmaker) -> None:  # noqa: F811
+    assert client.post("/financing", json={}, headers=_login(client, "viewer")).status_code == 403
+    assert _events(db)[-1] == "simulation_forbidden"

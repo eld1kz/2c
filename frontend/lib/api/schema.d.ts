@@ -345,6 +345,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/financing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Financing */
+        post: operations["financing_financing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -593,6 +610,49 @@ export interface components {
             ref: string;
             /** Label */
             label: string | null;
+        };
+        /** FinancingIn */
+        FinancingIn: {
+            /** Scenarios */
+            scenarios?: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"])[];
+        };
+        /** FinancingOptionOut */
+        FinancingOptionOut: {
+            /** Rank */
+            rank: number;
+            /** Option Id */
+            option_id: string;
+            /** Name */
+            name: string;
+            /** Cost Cents */
+            cost_cents: number;
+            /** Max Amount Cents */
+            max_amount_cents: number;
+            /** Covers Gap */
+            covers_gap: boolean;
+            /** Pros */
+            pros: string[];
+            /** Cons */
+            cons: string[];
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
+            /** By Counterparty */
+            by_counterparty: components["schemas"]["SupplierShareOut"][];
+        };
+        /** FinancingOut */
+        FinancingOut: {
+            /**
+             * Based On
+             * @enum {string}
+             */
+            based_on: "base" | "scenario";
+            /** Currency */
+            currency: string;
+            gap: components["schemas"]["GapOut"] | null;
+            /** Options */
+            options: components["schemas"]["FinancingOptionOut"][];
+            /** Disclaimer */
+            disclaimer: string;
         };
         /** ForecastLineOut */
         ForecastLineOut: {
@@ -889,6 +949,16 @@ export interface components {
             subject: string | null;
             /** At */
             at: string | null;
+        };
+        /** SupplierShareOut */
+        SupplierShareOut: {
+            counterparty: components["schemas"]["EvidenceRef"];
+            /** Amount Cents */
+            amount_cents: number;
+            /** Covers Gap Alone */
+            covers_gap_alone: boolean;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
         };
         /** TokenOut */
         TokenOut: {
@@ -1637,6 +1707,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhatIfOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    financing_financing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinancingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancingOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,4 +1,5 @@
 """POST /whatif: the 13-week forecast before and after a scenario, for the what-if page (SPEC §6.5).
+POST /financing: the financing options ranked for the base gap, or for the gap left after a scenario (§6.7).
 
 Owner and accountant only: simulations are SUGGEST tier, and viewers get READ (SPEC §8); a refusal
 is audited. The engine computes everything; nothing is written. Scenario inputs are checked like the
@@ -15,11 +16,22 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, get_session
 from app.api.routes_dashboard import gap_out
-from app.api.schemas import AssumptionOut, EvidenceRef, WhatIfIn, WhatIfOut, WhatIfWeekOut
+from app.api.schemas import (
+    AssumptionOut,
+    EvidenceRef,
+    FinancingIn,
+    FinancingOptionOut,
+    FinancingOut,
+    SupplierShareOut,
+    WhatIfIn,
+    WhatIfOut,
+    WhatIfWeekOut,
+)
 from app.audit import log as audit
 from app.auth.rbac import can_propose
 from app.config import Settings, get_settings
 from app.db.models import Tier, User
+from app.engine.financing import NOT_FINANCIAL_ADVICE, rank_financing
 from app.engine.forecast import project
 from app.engine.snapshot import Snapshot, load_snapshot
 from app.engine.whatif import (
@@ -47,7 +59,7 @@ def require_simulation_role(session: Session, user: User, tool: str) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"role {user.role.value} may not run simulations")
 
 
-def simulate(session: Session, user: User, body: WhatIfIn, settings: Settings) -> tuple[Snapshot, list[Scenario]]:
+def simulate(session: Session, user: User, body: WhatIfIn | FinancingIn, settings: Settings) -> tuple[Snapshot, list[Scenario]]:
     """The caller's snapshot and the checked scenarios (422 on a bad target or value)."""
     snap = load_snapshot(session, user.business_id, settings.demo_today)
     scenarios = to_scenarios(body.scenarios, settings.demo_today)
@@ -106,3 +118,38 @@ def whatif(body: WhatIfIn, user: User = Depends(current_user), session: Session 
     return WhatIfOut(as_of=base.as_of, currency=base.currency, min_cash_buffer_cents=base.min_cash_buffer,
                      assumptions=[_assumption(session, snap, s) for s in scenarios], weeks=weeks,
                      base_gap=gap_out(base), scenario_gap=gap_out(result.scenario))
+
+
+@router.post("/financing", response_model=FinancingOut)
+def financing(body: FinancingIn, user: User = Depends(current_user), session: Session = Depends(get_session),
+              settings: Settings = Depends(get_settings)) -> FinancingOut:
+    require_simulation_role(session, user, "rank_financing")
+    snap, scenarios = simulate(session, user, body, settings)
+    forecast = project(snap)
+    if scenarios:
+        try:
+            forecast = run_what_if(forecast, scenarios).scenario
+        except ScenarioError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+    based_on = "scenario" if scenarios else "base"
+    gap = forecast.gap()
+    if gap is None:
+        return FinancingOut(based_on=based_on, currency=forecast.currency, gap=None, options=[],
+                            disclaimer=NOT_FINANCIAL_ADVICE)
+    ranking = rank_financing(gap, forecast, snap)
+    refs = [r for o in ranking.options for r in o.evidence_ids]
+    refs += [f"counterparty:{s.counterparty_id}" for o in ranking.options for s in o.by_counterparty]
+    names = ledger.labels(session, user.business_id, refs)
+
+    def evidence(ids: tuple[str, ...] | list[str]) -> list[EvidenceRef]:
+        return [EvidenceRef(ref=r, label=names.get(r)) for r in ids]
+
+    options = [FinancingOptionOut(
+        rank=rank, option_id=o.option_id, name=o.name, cost_cents=o.cost, max_amount_cents=o.max_amount,
+        covers_gap=o.covers_gap, pros=list(o.pros), cons=list(o.cons), evidence=evidence(o.evidence_ids),
+        by_counterparty=[SupplierShareOut(counterparty=evidence([f"counterparty:{s.counterparty_id}"])[0],
+                                          amount_cents=s.amount, covers_gap_alone=s.covers_gap,
+                                          evidence=evidence(s.evidence_ids)) for s in o.by_counterparty])
+        for rank, o in enumerate(ranking.options, start=1)]
+    return FinancingOut(based_on=based_on, currency=ranking.currency, gap=gap_out(forecast), options=options,
+                        disclaimer=ranking.disclaimer)

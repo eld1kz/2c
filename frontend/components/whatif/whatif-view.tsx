@@ -1,15 +1,19 @@
 "use client";
 
-import { CircleAlertIcon } from "lucide-react";
+import { CircleAlertIcon, LandmarkIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Schemas } from "@/lib/api/client";
 import { useMe, useWhatIf } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
+import { formatCents } from "@/lib/money";
 import { parseScenarios } from "@/lib/scenarios";
 
 import { Assumptions } from "./assumptions";
+import { FinancingView } from "./financing-view";
 import { WhatIfChart, WhatIfLegend } from "./whatif-chart";
 import { WhatIfLinks } from "./whatif-links";
 import { WhatIfSummary, whatIfTitle } from "./whatif-summary";
@@ -24,21 +28,34 @@ function Problem({ children }: { children: React.ReactNode }) {
   );
 }
 
+const ASK_BASE = "What's the cheapest way to cover the cash gap? Prepare what you recommend for my approval.";
+
+/** The question "Ask the CFO to prepare this" fills in (the person still presses Send). */
+function askFor(r: Schemas["WhatIfOut"] | undefined, leftover: boolean): string {
+  const [a, ...rest] = r?.assumptions ?? [];
+  if (!leftover || !a || rest.length || a.type !== "collect_receivable" || !a.counterparty_name) return ASK_BASE;
+  return `Assume ${a.counterparty_name} pays ${a.invoice?.label ?? "the invoice"} now. What's the cheapest way to cover the cash gap that's left? Prepare what you recommend for my approval.`;
+}
+
 /** The what-if page: a scenario from the URL, today's forecast next to the scenario, and its assumptions. */
 export function WhatIfView() {
-  const raw = useSearchParams().get("s");
+  const params = useSearchParams();
+  const raw = params.get("s");
   const scenarios = useMemo(() => parseScenarios(raw), [raw]);
   const me = useMe();
   const viewer = me.data?.user.role === "viewer";
   const result = useWhatIf(scenarios ?? [], !!me.data && !viewer);
   const [asTable, setAsTable] = useState(false);
+  const [financing, setFinancing] = useState<"scenario" | "base" | null>(params.get("view") === "financing" ? "scenario" : null);
   const r = result.data;
+  const hasScenario = !!scenarios?.length;
+  const basis = hasScenario ? financing : financing && "base";
 
   return (
     <div className="max-w-4xl space-y-5">
       <div>
         <p className="text-xs font-medium text-ink-3">Simulation · nothing in your books changes</p>
-        <h1 className="mt-1 text-[26px] leading-[1.2] font-semibold tracking-tight text-ink md:text-[30px]">{r ? whatIfTitle(r) : "What if…"}</h1>
+        <h1 className="mt-1 text-[26px] leading-[1.2] font-semibold tracking-tight text-ink md:text-[30px]">{r ? whatIfTitle(r) : hasScenario ? "What if…" : "What-if and financing"}</h1>
       </div>
 
       {viewer && <Problem>Simulations need an owner or accountant. Viewers can see the forecast on the overview.</Problem>}
@@ -48,6 +65,11 @@ export function WhatIfView() {
           <p className="text-[15px] text-ink-2">Pick a scenario to compare with today&apos;s forecast, or ask the CFO to run one.</p>
           <div className="flex flex-wrap gap-2">
             <WhatIfLinks />
+            {!basis && (
+              <Button variant="secondary" size="sm" onClick={() => setFinancing("base")}>
+                <LandmarkIcon /> Compare financing for today&apos;s gap
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -89,7 +111,36 @@ export function WhatIfView() {
               )}
             </div>
           </section>
+
+          {r && financing === null && (
+            <Button variant="primary" size="lg" onClick={() => setFinancing(r.scenario_gap ? "scenario" : "base")}>
+              <LandmarkIcon />
+              {r.scenario_gap
+                ? `Compare financing for the ${formatCents(r.scenario_gap.amount_cents, r.currency)} left`
+                : "Compare financing for today's gap"}
+            </Button>
+          )}
         </>
+      )}
+
+      {basis && !viewer && (
+        <div className="space-y-3 border-t border-line pt-5">
+          {hasScenario && (
+            <div className="flex w-fit rounded-lg bg-sunken p-0.5 text-xs font-medium" role="group" aria-label="Gap to finance">
+              {([["scenario", "Gap left after this scenario"], ["base", "Today's gap"]] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setFinancing(v)}
+                  aria-pressed={basis === v}
+                  className={cn("rounded-md px-2.5 py-1", basis === v ? "bg-surface text-ink shadow-sm" : "text-ink-2")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <FinancingView scenarios={basis === "scenario" && scenarios ? scenarios : []} ask={askFor(r, basis === "scenario")} />
+        </div>
       )}
     </div>
   );

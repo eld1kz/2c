@@ -33,9 +33,16 @@ export function WhatIfPanel({ scenarios }: { scenarios: ScenarioInput[] }) {
       ) : (
         <Skeleton className="mt-2 h-[220px]" />
       )}
-      <Link href={whatIfHref(scenarios)} className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-ink hover:underline">
-        Open the what-if <ArrowRightIcon className="size-3.5" />
-      </Link>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <Link href={whatIfHref(scenarios)} className="inline-flex items-center gap-1 text-sm font-medium text-brand-ink hover:underline">
+          Open the what-if <ArrowRightIcon className="size-3.5" />
+        </Link>
+        {r?.scenario_gap && (
+          <Link href={whatIfHref(scenarios, "financing")} className="inline-flex items-center gap-1 text-sm font-medium text-brand-ink hover:underline">
+            Compare financing for what&apos;s left <ArrowRightIcon className="size-3.5" />
+          </Link>
+        )}
+      </div>
     </section>
   );
 }

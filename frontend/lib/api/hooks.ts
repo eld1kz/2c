@@ -44,6 +44,15 @@ export const useWhatIf = (scenarios: ScenarioInput[], enabled = true) =>
     retry: false,
   });
 
+/** Financing options for the base gap (no scenarios) or the gap left after the scenarios. Writes nothing. */
+export const useFinancing = (scenarios: ScenarioInput[], enabled = true) =>
+  useQuery({
+    queryKey: ["financing", JSON.stringify(scenarios)],
+    enabled,
+    queryFn: async () => unwrap(await api.POST("/financing", { body: { scenarios } })),
+    retry: false,
+  });
+
 export const useBudget = () =>
   useQuery({ queryKey: keys.budget, queryFn: async () => unwrap(await api.GET("/llm-budget")), refetchInterval: 60_000 });
 

@@ -7,6 +7,7 @@ import { useEvidence } from "@/components/evidence/evidence-provider";
 
 import { AskLink } from "@/components/chat/ask-link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompareFinancingLink } from "@/components/whatif/whatif-links";
 import { useForecast, useInsights } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/money";
@@ -49,8 +50,9 @@ export function DashboardView() {
       <div className="lg:col-start-1">
         {fc ? <CashHeadline forecast={fc} /> : <Skeleton className="h-28 max-w-xl" />}
         {fc?.gap && (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-2">
             <AskLink question="What's the cheapest way to cover the cash gap?">Ask how to close the gap</AskLink>
+            <CompareFinancingLink />
           </div>
         )}
         {forecast.isError && (

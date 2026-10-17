@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConicalIcon } from "lucide-react";
+import { FlaskConicalIcon, LandmarkIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -28,5 +28,19 @@ export function WhatIfLinks({ forecast }: { forecast?: Schemas["ForecastOut"] })
         </Button>
       ))}
     </>
+  );
+}
+
+/** Opens the financing comparison for today's gap. Hidden for viewers, like the what-if links. */
+export function CompareFinancingLink() {
+  const me = useMe();
+  if (!me.data || me.data.user.role === "viewer") return null;
+  return (
+    <Button asChild variant="secondary" size="sm">
+      <Link href={whatIfHref([], "financing")}>
+        <LandmarkIcon />
+        Compare financing
+      </Link>
+    </Button>
   );
 }

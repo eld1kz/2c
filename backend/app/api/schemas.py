@@ -244,6 +244,40 @@ class AssumptionOut(BaseModel):
     amount_source: Literal["records", "supplied"] | None = None
 
 
+class FinancingIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenarios: list[ScenarioIn] = Field(default_factory=list, max_length=MAX_SCENARIOS)  # none: the base gap
+
+
+class SupplierShareOut(BaseModel):
+    counterparty: EvidenceRef
+    amount_cents: int  # what deferring this supplier's payables provides
+    covers_gap_alone: bool
+    evidence: list[EvidenceRef]
+
+
+class FinancingOptionOut(BaseModel):
+    rank: int
+    option_id: str
+    name: str
+    cost_cents: int  # for this gap
+    max_amount_cents: int  # what the option can provide for this gap
+    covers_gap: bool
+    pros: list[str]
+    cons: list[str]
+    evidence: list[EvidenceRef]
+    by_counterparty: list[SupplierShareOut]
+
+
+class FinancingOut(BaseModel):
+    based_on: Literal["base", "scenario"]
+    currency: str
+    gap: GapOut | None
+    options: list[FinancingOptionOut]  # cheapest full cover first
+    disclaimer: str
+
+
 class WhatIfWeekOut(BaseModel):
     week: int
     label: str

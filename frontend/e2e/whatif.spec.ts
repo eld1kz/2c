@@ -28,7 +28,38 @@ test("cash-gap card → what-if: before/after, with the scenario shown as an ass
   await expect(week6).toContainText("−$1,997.67");
   await expect(week6).toContainText("$2,802.33");
   await expect(week6).toContainText("+$4,800.00");
+
+  // One click from the result to the financing ranking for the gap that is left.
+  await page.getByRole("button", { name: "Compare financing for the $2,381.99 left" }).click();
+  const financing = page.getByRole("region", { name: "Ways to cover the gap left after this scenario" });
+  const options = financing.getByRole("listitem").filter({ has: page.getByRole("heading") });
+  await expect(options.first()).toHaveAccessibleName("Option 1: Ask suppliers for +30 days on payment terms");
+  await expect(options.first()).toContainText("$0.00");
+  await expect(options.first()).toContainText("Covers the whole $2,381.99");
+  await expect(options.first()).toContainText("Verde Green Coffee Imports");
+  await expect(options.first()).toContainText("covers it alone");
+  await expect(options.nth(1)).toHaveAccessibleName("Option 2: Sandbox bank overdraft (18% APR)");
+  await expect(options.nth(1)).toContainText("$41.11");
+  await expect(financing).toContainText("Not financial advice.");
+  await financing.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `e2e/.results/financing-${info.project.name}.png`, fullPage: true });
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
+
+  await page.getByRole("button", { name: "Today's gap" }).click();
+  const base = page.getByRole("region", { name: "Ways to cover today's gap" });
+  await expect(base.getByRole("listitem").filter({ has: page.getByRole("heading") }).first()).toHaveAccessibleName(
+    "Option 1: Sandbox bank overdraft (18% APR)",
+  );
+  await expect(base).toContainText("Not enough alone");
   expect(errors).toEqual([]);
+});
+
+test("the overview opens the financing comparison for today's gap", async ({ page }) => {
+  await signIn(page, "owner");
+  await page.getByRole("link", { name: "Compare financing" }).click();
+  const base = page.getByRole("region", { name: "Ways to cover today's gap" });
+  await expect(base).toContainText("$7,181.99");
+  await expect(base.getByRole("link", { name: "Ask the CFO to prepare this" })).toHaveAttribute("href", /cheapest/);
 });
 
 test("viewers see no what-if shortcut and the page explains why", async ({ page }) => {
