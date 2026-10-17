@@ -72,7 +72,17 @@ def load(session: Session, golden_dir: Path = GOLDEN_DIR, classifier: Classifier
     business = Business(**data["business"])
     session.add(business)
     session.flush()
+    password_hash = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode()
+    for email, name, role in DEMO_USERS:
+        session.add(User(business_id=business.id, email=email, name=name, role=role, password_hash=password_hash))
+    load_business_data(session, business, golden_dir, classifier)
+    return business
 
+
+def load_business_data(session: Session, business: Business, golden_dir: Path = GOLDEN_DIR,
+                       classifier: Classifier | None = None) -> None:
+    """Everything the business owns except the Business row and its users (also used by the demo reset)."""
+    data = _read(golden_dir, "business.json")
     accounts = [Account(business_id=business.id, **acc) for acc in data["accounts"]]
     session.add_all(accounts)
 
@@ -99,10 +109,6 @@ def load(session: Session, golden_dir: Path = GOLDEN_DIR, classifier: Classifier
         session.flush()
         session.add_all(InvoiceLine(invoice_id=invoice.id, **line) for line in inv["lines"])
 
-    password_hash = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode()
-    for email, name, role in DEMO_USERS:
-        session.add(User(business_id=business.id, email=email, name=name, role=role, password_hash=password_hash))
-
     session.add(Policy(business_id=business.id, **DEFAULT_POLICY))
     _add_rules(session, business.id, _read(golden_dir, "rules.json"))
     session.flush()
@@ -111,7 +117,6 @@ def load(session: Session, golden_dir: Path = GOLDEN_DIR, classifier: Classifier
     for name in (Q2_FILE, Q3_FILE):
         ingest_csv(session, checking, name, (golden_dir / name).read_bytes(), classifier or NullClassifier())
     refresh_engine(session, business.id, get_settings().demo_today)
-    return business
 
 
 def main() -> None:

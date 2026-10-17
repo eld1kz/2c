@@ -14,6 +14,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { BudgetMeter } from "./budget-meter";
 import { NAV, type NavItem } from "./nav-items";
+import { ResetDemo } from "./reset-demo";
 
 async function signOut() {
   await fetch("/api/auth/logout", { method: "POST" });
@@ -92,10 +93,13 @@ function MoreMenu() {
         More
       </button>
       <SheetContent title="More">
-        <nav className="-mx-2 flex flex-col gap-0.5" aria-label="More" onClick={() => setOpen(false)}>
+        <nav className="-mx-2 flex flex-col gap-0.5" aria-label="More">
           {NAV.filter((item) => item.more).map((item) => (
-            <NavLink key={item.href} item={item} />
+            <div key={item.href} onClick={() => setOpen(false)}>
+              <NavLink item={item} />
+            </div>
           ))}
+          <ResetDemo onDone={() => setOpen(false)} />
           <button onClick={signOut} className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink-2 hover:bg-sunken">
             <LogOutIcon className="size-[18px]" />
             Sign out
@@ -123,6 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="mt-auto space-y-4 px-3">
+            <ResetDemo className="-mx-3 w-[calc(100%+1.5rem)] text-xs" />
             <BudgetMeter />
             <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
               <div className="min-w-0">

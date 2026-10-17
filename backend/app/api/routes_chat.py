@@ -28,6 +28,7 @@ from app.audit import log as audit
 from app.config import Settings, get_settings
 from app.db.models import AuditEvent, Role, User
 from app.services.action_service import utc_now
+from app.services.demo_reset import last_reset
 from app.services.llm_budget import LlmBudget, to_microusd
 
 router = APIRouter(tags=["chat"])
@@ -101,7 +102,8 @@ def chat(body: ChatIn, user: User = Depends(current_user), session: Session = De
     user_id, message, today = user.id, body.message, settings.demo_today
     release = lambda: conversations.end(user_id)  # noqa: E731 - idempotent
     try:
-        conversation = conversations.open(user.id, body.conversation_id)
+        conversation = conversations.open(user.id, body.conversation_id,
+                                          not_before=last_reset(session, user.business_id))
     except ConversationNotFound:
         release()
         _refuse(session, user, 404, "conversation not found")

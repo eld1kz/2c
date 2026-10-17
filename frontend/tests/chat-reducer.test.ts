@@ -97,6 +97,7 @@ describe("chat reducer: refusals before streaming", () => {
     [429, "chat limit reached (10 per 0:01:00)", "rate"],
     [409, "conversation is full; start a new one", "full"],
     [503, "the assistant is not configured", "unavailable"],
+    [404, "conversation not found", "unavailable"],
   ])("%i %s → %s notice, and the question is not kept as a turn", (status, message, kind) => {
     const s = run([start, { type: "refused", id: "t1", status, message, retryAfter: 60 }]);
     expect(s.turns).toEqual([]);

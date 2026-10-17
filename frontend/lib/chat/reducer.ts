@@ -74,6 +74,7 @@ function noticeFor(status: number, message: string, retryAfter: number | null): 
   if (status === 503 && /budget/i.test(message)) return { kind: "budget", message, retryAfter };
   if (status === 429) return { kind: "rate", message, retryAfter };
   if (status === 409) return { kind: "full", message };
+  if (status === 404) return { kind: "unavailable", message: "That conversation has ended (it expired or the demo was reset). Ask again to start a new one." };
   return { kind: "unavailable", message };
 }
 

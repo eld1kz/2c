@@ -145,6 +145,7 @@ class Conversation:
     messages: list[dict[str, Any]] = field(default_factory=list)
     turns: int = 0
     last_used: datetime = field(default_factory=utc_now)
+    created_at: datetime = field(default_factory=utc_now)
 
 
 class ConversationNotFound(LookupError):
@@ -164,10 +165,12 @@ class ConversationStore:
         self._busy: set[int] = set()
         self._lock = threading.Lock()
 
-    def open(self, user_id: int, conversation_id: str | None) -> Conversation:
+    def open(self, user_id: int, conversation_id: str | None, not_before: datetime | None = None) -> Conversation:
+        """`not_before`: conversations started earlier are gone (e.g. the demo data was reset since)."""
         now = self.clock()
         with self._lock:
-            for key in [k for k, c in self._items.items() if now - c.last_used > CONVERSATION_TTL]:
+            for key in [k for k, c in self._items.items() if now - c.last_used > CONVERSATION_TTL
+                        or (not_before is not None and c.user_id == user_id and c.created_at < not_before)]:
                 del self._items[key]
             if conversation_id is not None:
                 conv = self._items.get(conversation_id)
@@ -182,7 +185,7 @@ class ConversationStore:
                 elif len(self._items) >= MAX_CONVERSATIONS:
                     del self._items[min(self._items, key=lambda k: self._items[k].last_used)]
                 new_id = str(uuid.uuid4())
-                conv = self._items[new_id] = Conversation(new_id, user_id, AgentMemory(new_id))
+                conv = self._items[new_id] = Conversation(new_id, user_id, AgentMemory(new_id), created_at=now)
             conv.last_used = now
             return conv
 

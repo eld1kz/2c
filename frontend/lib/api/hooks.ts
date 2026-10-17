@@ -144,3 +144,11 @@ export function useUpload() {
     onSuccess: () => void queryClient.invalidateQueries(),
   });
 }
+
+export function useResetDemo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(await api.POST("/demo/reset")),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}

@@ -35,6 +35,7 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 - Tests: `cd backend && pytest -q`
 - Ship (the only way to commit): `scripts/ship.sh "phase N: <summary>"`
 - Seed: `cd backend && python -m seed.generate_golden && python -m seed.load`
+- Reset demo data to the golden state (keeps the audit log): `cd backend && python -m seed.reset`
 - Frontend: `cd frontend && npm run dev`
 - Local DB: `docker compose up -d db`
 
