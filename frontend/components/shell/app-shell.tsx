@@ -8,6 +8,8 @@ import { useMe, usePendingActions } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/money";
 
+import { EvidenceProvider } from "@/components/evidence/evidence-provider";
+
 import { BudgetMeter } from "./budget-meter";
 import { NAV, type NavItem } from "./nav-items";
 
@@ -77,54 +79,56 @@ function Wordmark() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[232px_1fr]">
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-3 py-5 md:flex">
-        <div className="px-3">
-          <Wordmark />
-          <p className="mt-4 truncate text-sm font-medium text-ink">{me?.business.name ?? " "}</p>
-          <p className="text-xs text-ink-3">{me ? `Data as of ${formatDate(me.as_of)}` : " "}</p>
-        </div>
-        <nav className="mt-6 flex flex-col gap-0.5" aria-label="Main">
-          {NAV.map((item) => (
-            <NavLink key={item.href} item={item} />
-          ))}
-        </nav>
-        <div className="mt-auto space-y-4 px-3">
-          <BudgetMeter />
-          <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{me?.user.name}</p>
-              {me && <RoleBadge role={me.user.role} />}
+    <EvidenceProvider>
+      <div className="min-h-dvh md:grid md:grid-cols-[232px_1fr]">
+        <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-3 py-5 md:flex">
+          <div className="px-3">
+            <Wordmark />
+            <p className="mt-4 truncate text-sm font-medium text-ink">{me?.business.name ?? " "}</p>
+            <p className="text-xs text-ink-3">{me ? `Data as of ${formatDate(me.as_of)}` : " "}</p>
+          </div>
+          <nav className="mt-6 flex flex-col gap-0.5" aria-label="Main">
+            {NAV.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </nav>
+          <div className="mt-auto space-y-4 px-3">
+            <BudgetMeter />
+            <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{me?.user.name}</p>
+                {me && <RoleBadge role={me.user.role} />}
+              </div>
+              <button onClick={signOut} className="rounded-md p-1.5 text-ink-3 hover:bg-sunken hover:text-ink" aria-label="Sign out" title="Sign out">
+                <LogOutIcon className="size-4" />
+              </button>
             </div>
-            <button onClick={signOut} className="rounded-md p-1.5 text-ink-3 hover:bg-sunken hover:text-ink" aria-label="Sign out" title="Sign out">
+          </div>
+        </aside>
+
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
+          <div className="min-w-0">
+            <Wordmark />
+            <p className="truncate text-xs text-ink-3">{me ? `${me.business.name}, as of ${formatDate(me.as_of)}` : " "}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            {me && <RoleBadge role={me.user.role} />}
+            <button onClick={signOut} className="rounded-md p-1.5 text-ink-3 hover:bg-sunken" aria-label="Sign out">
               <LogOutIcon className="size-4" />
             </button>
           </div>
-        </div>
-      </aside>
+        </header>
 
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
-        <div className="min-w-0">
-          <Wordmark />
-          <p className="truncate text-xs text-ink-3">{me ? `${me.business.name}, as of ${formatDate(me.as_of)}` : " "}</p>
-        </div>
-        <div className="flex items-center gap-1">
-          {me && <RoleBadge role={me.user.role} />}
-          <button onClick={signOut} className="rounded-md p-1.5 text-ink-3 hover:bg-sunken" aria-label="Sign out">
-            <LogOutIcon className="size-4" />
-          </button>
-        </div>
-      </header>
+        <main className="min-w-0 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12">
+          <div className="mx-auto max-w-[1120px]">{children}</div>
+        </main>
 
-      <main className="min-w-0 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12">
-        <div className="mx-auto max-w-[1120px]">{children}</div>
-      </main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
-        {NAV.map((item) => (
-          <NavLink key={item.href} item={item} compact />
-        ))}
-      </nav>
-    </div>
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
+          {NAV.map((item) => (
+            <NavLink key={item.href} item={item} compact />
+          ))}
+        </nav>
+      </div>
+    </EvidenceProvider>
   );
 }

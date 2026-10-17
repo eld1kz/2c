@@ -27,3 +27,19 @@ export function weekList(weeks: number[]): string {
   if (weeks.length === 1) return `week ${weeks[0]}`;
   return `weeks ${weeks.slice(0, -1).join(", ")} and ${weeks[weeks.length - 1]}`;
 }
+
+/** The question "Ask the CFO" fills in for an insight. */
+export function askAbout(insight: { type: string; title: string }): string {
+  switch (insight.type) {
+    case "LATE_PAYER":
+      return `What should I do about this late payment? ${insight.title}`;
+    case "CASH_GAP":
+      return "What's the cheapest way to cover the cash gap?";
+    case "DUPLICATE_SUBSCRIPTION":
+      return `Am I paying for the same thing twice? ${insight.title}`;
+    case "PRICE_CREEP":
+      return `How should I respond to this price rise? ${insight.title}`;
+    default:
+      return `Explain this and what I should do: ${insight.title}`;
+  }
+}

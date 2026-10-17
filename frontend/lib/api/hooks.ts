@@ -41,3 +41,18 @@ export const usePendingActions = () =>
     queryKey: keys.pending,
     queryFn: async () => unwrap(await api.GET("/actions", { params: { query: { status: "proposed" } } })),
   });
+
+export const useRecord = (ref: string | null) =>
+  useQuery({
+    queryKey: ["record", ref],
+    enabled: ref !== null,
+    queryFn: async () => unwrap(await api.GET("/records/{ref}", { params: { path: { ref: ref ?? "" } } })),
+  });
+
+export const useRecordLabels = (refs: string[]) =>
+  useQuery({
+    queryKey: ["record-labels", refs],
+    enabled: refs.length > 0,
+    queryFn: async () => unwrap(await api.GET("/records", { params: { query: { ref: refs } } })),
+    staleTime: Infinity,
+  });

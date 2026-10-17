@@ -52,3 +52,53 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Final agent answers (markdown). */
+.answer {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-ink);
+}
+.answer > * + * {
+  margin-top: 0.75em;
+}
+.answer h1,
+.answer h2,
+.answer h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 1.1em;
+}
+.answer ul,
+.answer ol {
+  padding-left: 1.25em;
+}
+.answer ul {
+  list-style: disc;
+}
+.answer ol {
+  list-style: decimal;
+}
+.answer li + li {
+  margin-top: 0.3em;
+}
+.answer strong {
+  font-weight: 600;
+}
+.answer code {
+  font-size: 0.9em;
+  background: var(--color-sunken);
+  border-radius: 4px;
+  padding: 0 0.25em;
+}
+.answer table {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  border-collapse: collapse;
+}
+.answer th,
+.answer td {
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.35em 0.75em 0.35em 0;
+  text-align: left;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { XIcon } from "lucide-react";
+import { ArrowLeftIcon, XIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 
 import { cn } from "@/lib/cn";
@@ -15,11 +15,13 @@ export function SheetContent({
   description,
   children,
   className,
+  onBack,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  onBack?: () => void;
 }) {
   return (
     <Dialog.Portal>
@@ -33,7 +35,12 @@ export function SheetContent({
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div className="min-w-0">
+          {onBack && (
+            <button onClick={onBack} className="-ml-1 rounded-md p-1 text-ink-3 hover:bg-sunken hover:text-ink" aria-label="Back">
+              <ArrowLeftIcon className="size-5" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
             <Dialog.Title className="text-base font-semibold text-ink">{title}</Dialog.Title>
             {description ? (
               <Dialog.Description className="mt-0.5 text-sm text-ink-3">{description}</Dialog.Description>

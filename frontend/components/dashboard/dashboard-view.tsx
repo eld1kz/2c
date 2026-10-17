@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 
+import { useEvidence } from "@/components/evidence/evidence-provider";
+
+import { AskLink } from "@/components/chat/ask-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useForecast, useInsights } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
+import { askAbout } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
 
 import { CashHeadline } from "./cash-headline";
@@ -12,7 +16,6 @@ import { ForecastChart } from "./forecast-chart";
 import { ForecastTable } from "./forecast-table";
 import { InsightCard } from "./insight-card";
 import { SideRail } from "./side-rail";
-import { WeekDetailSheet } from "./week-detail-sheet";
 
 const TOP_INSIGHTS = 3;
 
@@ -35,7 +38,8 @@ function Legend({ buffer, currency }: { buffer: number; currency: string }) {
 export function DashboardView() {
   const forecast = useForecast();
   const insights = useInsights();
-  const [week, setWeek] = useState<number | null>(null);
+  const evidence = useEvidence();
+  const setWeek = (week: number) => evidence?.open(`forecast_week:${week}`);
   const [asTable, setAsTable] = useState(false);
   const fc = forecast.data;
 
@@ -43,6 +47,11 @@ export function DashboardView() {
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_272px] lg:gap-x-10">
       <div className="lg:col-start-1">
         {fc ? <CashHeadline forecast={fc} /> : <Skeleton className="h-28 max-w-xl" />}
+        {fc?.gap && (
+          <div className="mt-4">
+            <AskLink question="What's the cheapest way to cover the cash gap?">Ask how to close the gap</AskLink>
+          </div>
+        )}
         {forecast.isError && (
           <p role="alert" className="mt-2 text-sm text-risk-ink">
             The forecast couldn&apos;t be loaded. Refresh the page to try again.
@@ -95,13 +104,12 @@ export function DashboardView() {
         </h2>
         <div className="mt-1 divide-y divide-line border-t border-line">
           {insights.data
-            ? insights.data.slice(0, TOP_INSIGHTS).map((i) => <InsightCard key={i.id} insight={i} />)
+            ? insights.data.slice(0, TOP_INSIGHTS).map((i) => <InsightCard key={i.id} insight={i} action={<AskLink question={askAbout(i)} />} />)
             : Array.from({ length: TOP_INSIGHTS }, (_, i) => <Skeleton key={i} className="my-4 h-16" />)}
           {insights.data?.length === 0 && <p className="py-4 text-sm text-ink-3">No open issues right now.</p>}
         </div>
       </section>
 
-      {fc && <WeekDetailSheet week={week} currency={fc.currency} onClose={() => setWeek(null)} />}
     </div>
   );
 }
