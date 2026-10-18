@@ -3,7 +3,8 @@ trailing 120 days. Impact = price rise × quantity bought in the window, annuali
 """
 
 from collections import defaultdict
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import date, timedelta
 
 from app.db.models import InsightType, InvoiceDirection, InvoiceStatus
 from app.engine.forecast import Forecast
@@ -14,7 +15,28 @@ WINDOW_DAYS = 120
 RISE_PCT = 10
 
 
-def detect(snap: Snapshot, forecast: Forecast) -> list[InsightSpec]:
+@dataclass(frozen=True)
+class PriceRise:
+    counterparty_id: int
+    sku: str
+    first_price: int  # unit price on the oldest invoice in the window
+    last_price: int  # unit price on the newest
+    first_date: date
+    last_date: date
+    quantity: int  # bought in the window
+    invoice_ids: tuple[int, ...]  # newest first
+
+    @property
+    def pct(self) -> int:
+        return (self.last_price - self.first_price) * 100 // self.first_price
+
+    @property
+    def annual_impact(self) -> int:
+        return (self.last_price - self.first_price) * self.quantity * 365 // WINDOW_DAYS
+
+
+def price_rises(snap: Snapshot) -> list[PriceRise]:
+    """Every (supplier, SKU) whose unit price rose more than RISE_PCT across the trailing window."""
     start = snap.as_of - timedelta(days=WINDOW_DAYS)
     points: dict[tuple[int, str], list[tuple[InvoiceFacts, InvoiceLineFacts]]] = defaultdict(list)
     for inv in snap.invoices:
@@ -31,16 +53,22 @@ def detect(snap: Snapshot, forecast: Forecast) -> list[InsightSpec]:
         first, last = group[0][1].unit_price, group[-1][1].unit_price
         if (last - first) * 100 <= first * RISE_PCT:
             continue
-        quantity = sum(line.quantity for _, line in group)
-        impact = (last - first) * quantity * 365 // WINDOW_DAYS
-        name = snap.counterparties[cp_id].name
+        out.append(PriceRise(cp_id, sku, first, last, group[0][0].issue_date, group[-1][0].issue_date,
+                             sum(line.quantity for _, line in group), tuple(inv.id for inv, _ in reversed(group))))
+    return out
+
+
+def detect(snap: Snapshot, forecast: Forecast) -> list[InsightSpec]:
+    out = []
+    for r in price_rises(snap):
+        name = snap.counterparties[r.counterparty_id].name
         out.append(InsightSpec(
             type=InsightType.PRICE_CREEP,
-            severity=annual_severity(impact),
-            title=(f"{name} raised {sku} by {(last - first) * 100 // first}% in {WINDOW_DAYS} days "
-                   f"({money(first, snap.currency)} → {money(last, snap.currency)} per unit)"),
-            impact_amount=impact,
+            severity=annual_severity(r.annual_impact),
+            title=(f"{name} raised {r.sku} by {r.pct}% in {WINDOW_DAYS} days "
+                   f"({money(r.first_price, snap.currency)} → {money(r.last_price, snap.currency)} per unit)"),
+            impact_amount=r.annual_impact,
             impact_period=PER_YEAR,
-            evidence_ids=tuple(f"invoice:{inv.id}" for inv, _ in reversed(group)),  # newest price first
+            evidence_ids=tuple(f"invoice:{i}" for i in r.invoice_ids),  # newest price first
         ))
     return out

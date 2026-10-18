@@ -39,6 +39,15 @@ but nothing sends it. The only supplier email the app can send is the Phase 6 te
 | A4 | The same action executed twice | The second call returns the original result; no duplicate SandboxPayment | `backend/tests/test_action_service.py::test_a4_executing_twice_returns_original_result`, `backend/tests/test_action_service.py::test_a4_db_rejects_second_sandbox_payment_for_one_action`, `backend/tests/test_action_service.py::test_idempotency_key_returns_the_same_action` |
 | A5 | Tamper with one AuditEvent row | `/audit/verify` reports the broken chain at that seq | `backend/tests/test_audit.py::test_a5_tampered_row_breaks_chain_at_that_seq`, `backend/tests/test_audit.py::test_recomputed_hash_after_tamper_still_breaks_next_link`, `backend/tests/test_api.py::test_audit_list_and_verify_detects_tamper`. A DB owner who rewrites the chain *and* recomputes every hash fools `/audit/verify`, but not the anchor committed with the evidence export: `backend/tests/test_evidence_export.py::test_the_anchor_catches_a_rewritten_chain_that_verify_accepts`, `backend/tests/test_evidence_export.py::test_the_anchor_catches_deleted_newest_events` |
 
+## Today (Phase 6c)
+
+| Case | Tests |
+|---|---|
+| Today ranks the decisions and opens without writing or calling the model | `backend/tests/test_today.py::test_top_three_decisions_by_impact`, `backend/tests/test_today.py::test_today_reads_without_writing_or_calling_the_model` |
+| Safe to spend = cash − cushion − this week's bills | `backend/tests/test_today.py::test_safe_to_spend_is_cash_minus_cushion_minus_this_weeks_bills`, `backend/tests/test_today.py::test_supplier_bills_due_this_week_count` |
+| One tap prepares the action once; roles decide who may | `backend/tests/test_today.py::test_preparing_a_reminder_proposes_it_once`, `backend/tests/test_today.py::test_roles_for_preparing`, `frontend/e2e/today.spec.ts::"one tap prepares the reminder and opens it for approval"` |
+| P3 price-review email: fixed template, stored contact, gated | `backend/tests/test_today.py::test_price_email_is_drafted_from_records_and_sent_to_the_stored_contact`, `backend/tests/test_today.py::test_price_request_gate` |
+
 ## Paperwork Center (Phase 6b)
 
 | Case | Tests |

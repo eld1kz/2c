@@ -10,6 +10,7 @@ test("signed-out visitors are sent to sign in", async ({ page }) => {
 test("dashboard shows cash, both dips and top insights", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
+  await page.goto("/dashboard");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("goes negative in weeks 6, 9 and 10");
   await expect(page.getByText("$8,650.00")).toBeVisible();
   await expect(page.getByText("−$2,181.99").first()).toBeVisible();

@@ -24,7 +24,7 @@ export function ResetDemo({ className, onDone }: { className?: string; onDone?: 
         setOpen(false);
         onDone?.();
         toast.success("Demo data reset. The audit log kept every earlier event.");
-        router.push("/dashboard");
+        router.push("/today");
       },
       onError: (e) => toast.error(e instanceof ApiError ? e.message : "The reset didn't finish. Try again."),
     });

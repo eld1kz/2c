@@ -18,6 +18,7 @@ type Action = Schemas["ActionOut"];
 const APPROVE_LABEL: Record<string, string> = {
   send_reminder: "Approve and send",
   send_terms_request: "Approve and send",
+  send_price_request: "Approve and send",
   schedule_payment: "Approve payment",
   submit_loan_application: "Approve application",
 };
@@ -25,6 +26,7 @@ const APPROVE_LABEL: Record<string, string> = {
 const GOES_TO: Record<string, string> = {
   send_reminder: "The customer's stored contact",
   send_terms_request: "The supplier's stored contact",
+  send_price_request: "The supplier's stored contact",
   schedule_payment: "The supplier's stored bank details, never details from documents",
 };
 

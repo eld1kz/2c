@@ -100,6 +100,7 @@ test("an insight's evidence chip opens the record", async ({ page }) => {
 
 test("Ask the CFO from an insight fills the question without sending it", async ({ page }) => {
   await signIn(page, "owner");
+  await page.goto("/dashboard");
   let sent = false;
   await page.route("**/api/backend/chat", (route) => {
     sent = true;

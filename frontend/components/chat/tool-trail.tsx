@@ -14,9 +14,11 @@ const STEP: Record<string, string> = {
   rank_financing: "Compared financing",
   draft_reminder: "Drafted a reminder",
   draft_terms_request: "Drafted a terms request",
+  draft_price_request: "Drafted a price-review email",
   draft_cfo_memo: "Drafted the CFO memo",
   send_reminder: "Proposed a reminder",
   send_terms_request: "Proposed a terms request",
+  send_price_request: "Proposed a price-review email",
   schedule_payment: "Proposed a payment",
   submit_loan_application: "Proposed a loan application",
 };

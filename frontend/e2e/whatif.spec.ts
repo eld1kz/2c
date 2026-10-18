@@ -8,6 +8,7 @@ import { noSideScroll, refFor, signIn, sse, watchConsole } from "./helpers";
 test("cash-gap card → what-if: before/after, with the scenario shown as an assumption", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
+  await page.goto("/dashboard");
   const card = page.getByRole("article").filter({ hasText: "Cash falls below" });
   await card.getByRole("link", { name: "What if Harbor Lane Café pays INV-1042?" }).click();
 
@@ -56,6 +57,7 @@ test("cash-gap card → what-if: before/after, with the scenario shown as an ass
 
 test("the overview opens the financing comparison for today's gap", async ({ page }) => {
   await signIn(page, "owner");
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Compare financing" }).click();
   const base = page.getByRole("region", { name: "Ways to cover today's gap" });
   await expect(base).toContainText("$7,181.99");
@@ -64,6 +66,7 @@ test("the overview opens the financing comparison for today's gap", async ({ pag
 
 test("viewers see no what-if shortcut and the page explains why", async ({ page }) => {
   await signIn(page, "viewer");
+  await page.goto("/dashboard");
   const inv = await refFor(page, "invoice", "INV-1042");
   await expect(page.getByRole("article").filter({ hasText: "Cash falls below" })).toBeVisible();
   await expect(page.getByRole("link", { name: /^What if/ })).toHaveCount(0);

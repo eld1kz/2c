@@ -32,19 +32,22 @@ from app.db.models import (
     Tier,
     User,
 )
+from app.engine.insights.price_creep import price_rises
+from app.engine.snapshot import load_snapshot
 from app.policy import gate
 from app.policy.gate import Actor, ActionRequest, Decision, GateContext
 from app.policy.limits import OPEN_STATUSES, invoice_outstanding
 from app.policy.tiers import (
     EXECUTE_PARAMS,
     SchedulePaymentParams,
+    SendPriceRequestParams,
     SendReminderParams,
     SendTermsRequestParams,
     SubmitLoanApplicationParams,
     tier_of,
 )
 from app.sandbox import bank, loans, outbox
-from app.services.drafts import Tone, reminder_draft, terms_request_draft
+from app.services.drafts import Tone, price_request_draft, reminder_draft, terms_request_draft
 
 MIN_TERMS_EXTENSION_DAYS = 7
 MAX_TERMS_EXTENSION_DAYS = 60
@@ -232,7 +235,7 @@ class ActionService:
                                           draft.result["body"], now)
                 return {"sandbox_email_id": email.id, "to_counterparty_id": customer.id, "invoice_id": invoice.id,
                         "status": email.status.value}
-            case SendTermsRequestParams():
+            case SendTermsRequestParams() | SendPriceRequestParams():
                 draft = self.session.get(Action, params.draft_id)
                 supplier = self.session.get(Counterparty, params.counterparty_id)
                 email = outbox.send_email(self.session, action, supplier, draft.result["subject"],
@@ -311,4 +314,30 @@ class ActionService:
             actor, "draft_terms_request", {"counterparty_id": supplier.id, "extension_days": extension_days},
             {"subject": draft.subject, "body": draft.body, "current_terms_days": current,
              "new_terms_days": None if current is None else current + extension_days},
+            counterparty_id=supplier.id)
+
+    def record_price_draft(self, actor: Actor, counterparty_id: int) -> Action:
+        """draft_price_request: a templated request asking a supplier to review a unit price that rose
+        (PRICE_CREEP), stored as an executed SUGGEST action. send_price_request (EXECUTE, owner) sends it."""
+        self._check_draft(actor, "draft_price_request")
+        supplier = self.session.get(Counterparty, counterparty_id)
+        if (supplier is None or supplier.business_id != actor.business_id
+                or supplier.kind not in (CounterpartyKind.supplier, CounterpartyKind.both)):
+            self._audit(actor.label, "draft_denied", None, business_id=actor.business_id,
+                        reason=f"supplier {counterparty_id} not found")
+            raise NotFound(f"supplier {counterparty_id} not found")
+        snap = load_snapshot(self.session, actor.business_id, self.today)
+        rises = sorted((r for r in price_rises(snap) if r.counterparty_id == supplier.id),
+                       key=lambda r: (-r.annual_impact, r.sku))
+        if not rises:
+            self._audit(actor.label, "draft_denied", None, business_id=actor.business_id,
+                        reason=f"no recent price rise from supplier {counterparty_id}")
+            raise NotFound(f"no recent price rise from supplier {counterparty_id}")
+        r = rises[0]
+        draft = price_request_draft(self.session.get(Business, actor.business_id), supplier, r.sku, r.first_price,
+                                    r.last_price, r.first_date, r.last_date, r.pct, snap.currency)
+        return self._store_draft(
+            actor, "draft_price_request", {"counterparty_id": supplier.id},
+            {"subject": draft.subject, "body": draft.body, "sku": r.sku, "first_price": r.first_price,
+             "last_price": r.last_price, "invoice_ids": list(r.invoice_ids)},
             counterparty_id=supplier.id)

@@ -45,6 +45,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 - Weekly CFO memo (generated in-app; email send was optional and is not built)
 - RBAC: owner / accountant / viewer
 - Paperwork Center (Phase 6b): cash-basis month-close reports and a printable bank-ready pack (§6.8). No balance sheet, no tax filing
+- Today home screen (Phase 6c): up to 3 decisions with one-tap prepared actions, safe to spend this week, where last month's money went (§6.9)
 
 ### Explicitly OUT of scope — do not build
 Real bank connections, real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
@@ -76,7 +77,7 @@ Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so f
     db/            models.py, session.py, migrations/ (alembic)
     ingestion/     csv_parser.py, normalizer.py, pipeline.py
     engine/        snapshot.py, categorize.py, llm_classifier.py, recurring.py, counterparty_stats.py,
-                   invoice_cycles.py, position.py, forecast.py, whatif.py, financing.py, memo.py, statements.py,
+                   invoice_cycles.py, position.py, forecast.py, whatif.py, financing.py, memo.py, statements.py, today.py,
                    refresh.py
     engine/insights/  late_payer.py, duplicate_subscription.py, price_creep.py,
                       cash_gap.py, unusual_expense.py, registry.py
@@ -91,7 +92,7 @@ Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so f
   seed/            generate_golden.py, load.py, reset.py, golden/ (generated CSVs + JSON)
   tests/
 /frontend
-  app/  dashboard, transactions, insights, chat, approvals, audit, upload, memo, what-if, paperwork, login
+  app/  today, dashboard, transactions, insights, chat, approvals, audit, upload, memo, what-if, paperwork, login
   app/api/  auth (session cookie), backend/[...path] (same-origin gateway)
 /deploy            production Docker Compose, Caddyfile, cron, env template, bootstrap
 /scripts           ship.sh, deploy.sh, check_deploy.sh, fetch_evidence.sh
@@ -192,6 +193,17 @@ Cash basis throughout: income is money received and expenses are money paid in t
 
   It is printed to one PDF by the browser.
 
+### 6.9 Today (`engine/today.py`, `services/today.py`)
+- **Decisions:** the 3 open insights with the largest `impact_amount`, each as one sentence from engine figures with one prepared action:
+  - LATE_PAYER → reminder for the most overdue invoice (firm when > 30 days late);
+  - PRICE_CREEP → price-review email to the supplier (`draft_price_request`);
+  - CASH_GAP → +30-day terms request to the supplier named by the supplier-terms financing option;
+  - anything else → "Ask about it".
+
+  Opening Today writes nothing and calls no model. Tapping the button drafts from the fixed template and proposes the EXECUTE action through ActionService, with the signed-in person as proposer (owner; accountant for reminders). A waiting proposal for the same target is reused, and a decision whose email went out within the cooldown shows "Sent".
+- **Safe to spend this week** = cash now − cushion (`min_cash_buffer`) − bills due in the next 7 days. Bills are recurring-series payments and open supplier invoices in forecast week 1, overdue ones included. Expected money in and typical spending are not counted. Below zero, Today says nothing is safe to spend and by how much the cushion is short.
+- **Where your money went:** last month's COGS and operating expenses from the cash-basis P&L (§6.8), largest first, linking to the full P&L.
+
 ## 7. Agent
 
 - Claude tool-use loop, max 6 model calls per user turn (the last with tools disabled, so it must answer); at most 3 EXECUTE proposals per turn; tools offered are filtered by the user's role.
@@ -202,8 +214,8 @@ Cash basis throughout: income is money received and expenses are money paid in t
 | Tier | Tool | Notes |
 |---|---|---|
 | READ | `get_cash_position`, `get_ledger(filters)`, `get_forecast`, `get_insights`, `explain_record(id)` | auto |
-| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_cfo_memo()` | auto; outputs are drafts, never sent by themselves (`draft_terms_request`: supplier payment-terms request from a fixed template) |
-| EXECUTE | `send_reminder(invoice_id, draft_id)`, `send_terms_request(counterparty_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
+| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_price_request(counterparty_id)`, `draft_cfo_memo()` | auto; outputs are drafts, never sent by themselves (`draft_terms_request`: supplier payment-terms request from a fixed template) |
+| EXECUTE | `send_reminder(invoice_id, draft_id)`, `send_terms_request(counterparty_id, draft_id)`, `send_price_request(counterparty_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
 
 The agent has **no** approve tool. Approvals come only from an authenticated human via API.
 
@@ -226,6 +238,7 @@ The agent has **no** approve tool. Approvals come only from an authenticated hum
   The tool takes no payee name or bank/account fields; execution always uses the counterparty's stored details. No new beneficiary or bank details are ever accepted from documents.
 - `send_reminder`: max 1 per invoice per `reminder_cooldown_days` (7).
 - `send_terms_request(counterparty_id, draft_id)` — owner only; DENY unless the counterparty is a supplier of this business with a stored `contact_email`, the draft is a `draft_terms_request` for that supplier and at most `reminder_cooldown_days` old, and no terms request went to that supplier within `reminder_cooldown_days`. The email is the draft's fixed-template text (the LLM only picks `extension_days`), sent to the supplier's stored address via the sandbox outbox.
+- `send_price_request(counterparty_id, draft_id)` — owner only; the same rules as `send_terms_request` with a `draft_price_request` draft (a fixed template built from the PRICE_CREEP SKU, its first and last unit prices and invoice dates; never invoice notes), and at most one price request per supplier within `reminder_cooldown_days`.
 - Idempotency key per action; re-execution returns original result.
 - Viewer role: READ only. Accountant: READ/SUGGEST + reminders. Owner: all + approvals.
 - Every tool call, proposal, decision, execution, denial → AuditEvent. `hash = sha256(prev_hash + canonical_json(event))`. `GET /audit/verify` recomputes the chain.
@@ -245,7 +258,7 @@ Fictional vendor names only (no real brands).
 |---|---|---|---|
 | P1 | Harbor Lane Café: INV-1042 $4,800, 45 days overdue; history avg 28 days late | LATE_PAYER high | Agent drafts firm-but-polite reminder → owner approves → SandboxEmail sent |
 | P2 | `DESIGNLY PRO` and `DESIGNLY*TEAM` both ~$29.99/mo | DUPLICATE_SUBSCRIPTION, impact ≈ $360/yr | Agent recommends cancelling one (SUGGEST) |
-| P3 | Verde Green Coffee Imports: bean unit price +18% over 4 months | PRICE_CREEP, annualized impact | Agent suggests negotiation + drafts supplier email |
+| P3 | Verde Green Coffee Imports: bean unit price +18% over 4 months | PRICE_CREEP, annualized impact | Agent (or Today) drafts a price-review email from a fixed template → owner approves → SandboxEmail sent |
 | P4 | Week 6: quarterly equipment lease $12,000 + payroll → closing below $5,000 buffer | CASH_GAP high | Agent runs what-if (collect P1 on time), ranks financing, proposes cheapest fix |
 
 ### Adversarial cases
@@ -260,6 +273,7 @@ Fictional vendor names only (no real brands).
 ---
 
 ## 10. Frontend pages
+- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went. Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
 - `/dashboard` — cash now, 13-week chart with buffer line, top 3 insights, pending approvals count
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button

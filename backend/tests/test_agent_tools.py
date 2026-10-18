@@ -24,7 +24,8 @@ from app.services.action_service import Forbidden
 from tests.conftest import Demo
 
 READ = ["get_cash_position", "get_ledger", "get_forecast", "get_insights", "explain_record"]
-SUGGEST = ["run_what_if", "rank_financing", "draft_reminder", "draft_terms_request", "draft_cfo_memo"]
+SUGGEST = ["run_what_if", "rank_financing", "draft_reminder", "draft_terms_request", "draft_price_request",
+           "draft_cfo_memo"]
 
 
 def _ctx(demo: Demo, role: str = "owner") -> ToolContext:
@@ -43,8 +44,8 @@ def _sandbox_rows(demo: Demo) -> int:
 
 
 def test_registry_matches_the_tier_table() -> None:
-    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 14
-    assert TOOLS["send_terms_request"].tier == Tier.EXECUTE
+    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 16
+    assert TOOLS["send_terms_request"].tier == TOOLS["send_price_request"].tier == Tier.EXECUTE
     assert TOOLS["draft_terms_request"].tier == Tier.SUGGEST
     assert [n for n, s in TOOLS.items() if s.tier == Tier.READ] == READ
     assert [n for n, s in TOOLS.items() if s.tier == Tier.SUGGEST] == SUGGEST
@@ -198,6 +199,18 @@ def test_draft_terms_request(demo: Demo) -> None:
     with pytest.raises(Forbidden):
         demo.service.record_terms_draft(demo.actor("viewer"), verde, 30)
     assert demo.session.scalar(select(AuditEvent).order_by(AuditEvent.seq.desc()).limit(1)).event_type == "draft_denied"
+
+
+def test_draft_and_propose_price_request(demo: Demo) -> None:
+    ctx = _ctx(demo)
+    verde = demo.counterparties["Verde Green Coffee Imports"].id
+    result, _ = _call(ctx, "draft_price_request", counterparty_id=verde)
+    draft = result["data"]
+    assert (draft["tool"], draft["tier"], draft["status"]) == ("draft_price_request", "SUGGEST", "executed")
+    assert "GRN-COL-HUILA" in draft["result"]["body"] and "Draft only" in draft["note"] and _sandbox_rows(demo) == 0
+    proposal, _ = _call(ctx, "send_price_request", counterparty_id=verde, draft_id=draft["draft_id"],
+                        rationale="Verde raised the bean price 18%.")
+    assert proposal["data"]["status"] == "proposed" and _sandbox_rows(demo) == 0
 
 
 def test_every_call_is_audited(demo: Demo) -> None:

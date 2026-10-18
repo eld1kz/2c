@@ -5,8 +5,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.api import (routes_actions, routes_audit, routes_auth, routes_chat, routes_dashboard, routes_demo,
-                     routes_memo, routes_paperwork, routes_records, routes_transactions, routes_upload,
-                     routes_whatif)
+                     routes_memo, routes_paperwork, routes_records, routes_today, routes_transactions,
+                     routes_upload, routes_whatif)
 from app.config import check_jwt_secret, check_production, get_settings
 
 settings = get_settings()
@@ -24,7 +24,8 @@ app.add_middleware(
 )
 for router in (routes_auth.router, routes_actions.router, routes_audit.router, routes_upload.router,
                routes_chat.router, routes_dashboard.router, routes_records.router, routes_transactions.router,
-               routes_demo.router, routes_whatif.router, routes_memo.router, routes_paperwork.router):
+               routes_demo.router, routes_whatif.router, routes_memo.router, routes_paperwork.router,
+               routes_today.router):
     app.include_router(router)
 
 

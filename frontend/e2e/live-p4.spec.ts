@@ -30,6 +30,7 @@ test("live P4: cash gap → what-if → leftover financing → reminder + terms 
   test.setTimeout(480_000);
   const errors = watchConsole(page);
   await signIn(page, "owner");
+  await page.goto("/dashboard");
 
   // 1. the cash-gap card → what-if
   const gapCard = page.getByRole("article").filter({ hasText: "Cash falls below" });
@@ -90,7 +91,7 @@ test("live P4: cash gap → what-if → leftover financing → reminder + terms 
   // 6. reset: back to the golden state, audit log kept and still verifying
   await page.getByRole("button", { name: "Reset demo data" }).first().click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Reset demo data" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/today$/);
   await page.goto("/approvals");
   await expect(page.getByRole("tab", { name: "Waiting (0)" })).toBeVisible();
   await page.goto("/audit");

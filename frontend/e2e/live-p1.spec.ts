@@ -25,6 +25,7 @@ test("live P1: late-payer insight → chat → draft → approve → sandbox ema
   test.setTimeout(420_000);
   const errors = watchConsole(page);
   await signIn(page, "owner");
+  await page.goto("/dashboard");
 
   // 1. the insight
   const insight = page.getByRole("article").filter({ hasText: "INV-1042 is 45 days overdue" });
@@ -63,7 +64,7 @@ test("live P1: late-payer insight → chat → draft → approve → sandbox ema
   // 5. reset with the owner's button: back to the golden state, audit log kept and still verifying
   await page.getByRole("button", { name: "Reset demo data" }).first().click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Reset demo data" }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/today$/);
   await page.goto("/approvals");
   await expect(page.getByRole("tab", { name: "Waiting (0)" })).toBeVisible();
   await page.getByRole("tab", { name: "Decided" }).click();

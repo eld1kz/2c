@@ -15,7 +15,7 @@ export async function signIn(page: Page, role: "owner" | "accountant" | "viewer"
   await page.getByLabel("Email").fill(`${role}@emberoak.demo`);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/today");
 }
 
 export async function noSideScroll(page: Page): Promise<number> {

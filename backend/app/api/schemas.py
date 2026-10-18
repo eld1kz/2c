@@ -523,3 +523,50 @@ class BankPackOut(BaseModel):
     forecast: list[ForecastWeekOut]
     obligations: ObligationsOut
     receivables: AgingOut
+
+
+# --- Today (SPEC §6.9): the home screen; integers from engine/today.py and services/today.py ------
+
+
+class TodayDecisionOut(BaseModel):
+    insight: EvidenceRef
+    type: str
+    kind: str  # reminder | price_email | terms_request | ask
+    text: str  # one plain sentence; its figures come from the engine
+    impact_cents: int
+    impact_period: str
+    target_name: str | None
+    evidence: list[EvidenceRef]
+    pending_action_id: int | None  # prepared and waiting for approval
+    sent_action_id: int | None  # sent within the cooldown: nothing to prepare
+
+
+class BillOut(BaseModel):
+    date: date
+    source: EvidenceRef  # recurring_series:N or invoice:N
+    amount_cents: int  # money out
+
+
+class SafeToSpendOut(BaseModel):
+    cash_cents: int
+    cushion_cents: int
+    bills: list[BillOut]
+    bills_total_cents: int
+    amount_cents: int  # cash − cushion − bills; negative when the cushion is already eaten into
+    short_by_cents: int
+    accounts: list[EvidenceRef]
+
+
+class SpendingOut(BaseModel):
+    period: PeriodOut
+    lines: list[PnlLineOut]  # largest first
+    total_cents: int
+
+
+class TodayOut(BaseModel):
+    as_of: date
+    currency: str
+    name: str
+    decisions: list[TodayDecisionOut]
+    safe_to_spend: SafeToSpendOut
+    spending: SpendingOut

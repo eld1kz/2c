@@ -64,7 +64,8 @@ def display(session: Session, action: Action, today: Any) -> dict[str, Any]:
     out["title"] = action_names.title(action, name, draft)
 
     match action.tool:
-        case "send_reminder" | "draft_reminder" | "send_terms_request" | "draft_terms_request":
+        case ("send_reminder" | "draft_reminder" | "send_terms_request" | "draft_terms_request" | "send_price_request"
+              | "draft_price_request"):
             if draft is not None and draft.result:
                 out["email"] = {"to_name": name, "subject": draft.result.get("subject"), "body": draft.result.get("body")}
                 if action.tool.endswith("_reminder"):

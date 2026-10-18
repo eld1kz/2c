@@ -414,6 +414,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Today */
+        get: operations["get_today_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/today/decisions/{insight_id}/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare */
+        post: operations["prepare_today_decisions__insight_id__prepare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -677,6 +711,17 @@ export interface components {
             forecast: components["schemas"]["ForecastWeekOut"][];
             obligations: components["schemas"]["ObligationsOut"];
             receivables: components["schemas"]["AgingOut"];
+        };
+        /** BillOut */
+        BillOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            source: components["schemas"]["EvidenceRef"];
+            /** Amount Cents */
+            amount_cents: number;
         };
         /** Body_upload_upload_post */
         Body_upload_upload_post: {
@@ -1231,6 +1276,23 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** SafeToSpendOut */
+        SafeToSpendOut: {
+            /** Cash Cents */
+            cash_cents: number;
+            /** Cushion Cents */
+            cushion_cents: number;
+            /** Bills */
+            bills: components["schemas"]["BillOut"][];
+            /** Bills Total Cents */
+            bills_total_cents: number;
+            /** Amount Cents */
+            amount_cents: number;
+            /** Short By Cents */
+            short_by_cents: number;
+            /** Accounts */
+            accounts: components["schemas"]["EvidenceRef"][];
+        };
         /** SandboxResultOut */
         SandboxResultOut: {
             /** Kind */
@@ -1246,6 +1308,14 @@ export interface components {
             /** At */
             at: string | null;
         };
+        /** SpendingOut */
+        SpendingOut: {
+            period: components["schemas"]["PeriodOut"];
+            /** Lines */
+            lines: components["schemas"]["PnlLineOut"][];
+            /** Total Cents */
+            total_cents: number;
+        };
         /** SupplierShareOut */
         SupplierShareOut: {
             counterparty: components["schemas"]["EvidenceRef"];
@@ -1255,6 +1325,44 @@ export interface components {
             covers_gap_alone: boolean;
             /** Evidence */
             evidence: components["schemas"]["EvidenceRef"][];
+        };
+        /** TodayDecisionOut */
+        TodayDecisionOut: {
+            insight: components["schemas"]["EvidenceRef"];
+            /** Type */
+            type: string;
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+            /** Impact Cents */
+            impact_cents: number;
+            /** Impact Period */
+            impact_period: string;
+            /** Target Name */
+            target_name: string | null;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
+            /** Pending Action Id */
+            pending_action_id: number | null;
+            /** Sent Action Id */
+            sent_action_id: number | null;
+        };
+        /** TodayOut */
+        TodayOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Name */
+            name: string;
+            /** Decisions */
+            decisions: components["schemas"]["TodayDecisionOut"][];
+            safe_to_spend: components["schemas"]["SafeToSpendOut"];
+            spending: components["schemas"]["SpendingOut"];
         };
         /** TokenOut */
         TokenOut: {
@@ -2125,6 +2233,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BankPackOut"];
+                };
+            };
+        };
+    };
+    get_today_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+        };
+    };
+    prepare_today_decisions__insight_id__prepare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                insight_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

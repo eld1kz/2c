@@ -16,6 +16,8 @@ describe("backend proxy allowlist", () => {
     ["POST", "memo"],
     ["GET", "paperwork/month-close"],
     ["GET", "paperwork/bank-pack"],
+    ["GET", "today"],
+    ["POST", "today/decisions/4/prepare"],
   ])("allows %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(true));
 
   it.each([
@@ -29,17 +31,19 @@ describe("backend proxy allowlist", () => {
     ["POST", "whatif/1"],
     ["POST", "paperwork/month-close"], // read-only
     ["GET", "paperwork/other"],
+    ["POST", "today"],
+    ["GET", "today/decisions/4/prepare"],
   ])("refuses %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(false));
 });
 
 describe("safeNext", () => {
   it.each([
-    [null, "/dashboard"],
+    [null, "/today"],
     ["/approvals", "/approvals"],
-    ["//evil.example", "/dashboard"],
-    ["/\\evil.example", "/dashboard"],
-    ["https://evil.example", "/dashboard"],
-    ["/login", "/dashboard"],
+    ["//evil.example", "/today"],
+    ["/\\evil.example", "/today"],
+    ["https://evil.example", "/today"],
+    ["/login", "/today"],
   ])("%s → %s", (next, out) => expect(safeNext(next)).toBe(out));
 });
 

@@ -148,12 +148,13 @@ def test_loan_application_limits(demo: Demo, option: str, amount: int, decision:
 
 def test_every_execute_tool_has_a_closed_schema() -> None:
     execute = {tool for tool, tier in TOOL_TIERS.items() if tier == "EXECUTE"}
-    assert execute == set(EXECUTE_PARAMS) == {"send_reminder", "send_terms_request", "schedule_payment",
-                                              "submit_loan_application"}
+    assert execute == set(EXECUTE_PARAMS) == {"send_reminder", "send_terms_request", "send_price_request",
+                                              "schedule_payment", "submit_loan_application"}
     assert set(EXECUTE_PARAMS["send_terms_request"].model_fields) == {"counterparty_id", "draft_id"}
+    assert set(EXECUTE_PARAMS["send_price_request"].model_fields) == {"counterparty_id", "draft_id"}
     assert all(model.model_config["extra"] == "forbid" for model in EXECUTE_PARAMS.values())
     assert set(EXECUTE_PARAMS["schedule_payment"].model_fields) == {"payee_counterparty_id", "invoice_id", "amount", "date"}
-    assert TOOL_TIERS["draft_terms_request"] == "SUGGEST"
+    assert TOOL_TIERS["draft_terms_request"] == TOOL_TIERS["draft_price_request"] == "SUGGEST"
 
 
 def test_cooldown_window(demo: Demo) -> None:

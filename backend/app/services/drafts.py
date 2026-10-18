@@ -1,4 +1,4 @@
-"""Reminder and supplier terms-request drafts from fixed templates (Phase 3 D2, Phase 4).
+"""Reminder, supplier terms-request and price-review drafts from fixed templates (Phase 3 D2, 4, 6c).
 
 The text is built only from structured records (invoice number, amount, dates, names, payment
 stats), never from invoice notes or LLM output, so untrusted document text cannot reach an
@@ -59,4 +59,19 @@ def terms_request_draft(business: Business, supplier: Counterparty, current_term
     body = (f"Hello {supplier.name},\n\n{record}To smooth our cash flow over the coming weeks, could you {terms}, "
             f"starting with invoices issued from {start}? Please let us know whether this works for you.\n\n"
             f"Kind regards,\n{business.name}")
+    return Draft(subject, body)
+
+
+def price_request_draft(business: Business, supplier: Counterparty, sku: str, first_price: int, last_price: int,
+                        first_date: date, last_date: date, pct: int, currency: str) -> Draft:
+    """Ask a supplier to review a unit price that rose `pct`% between two of its invoices."""
+    def day(d: date) -> str:
+        return f"{d:%B} {d.day}, {d.year}"
+
+    subject = f"Price review: {sku}"
+    body = (f"Hello {supplier.name},\n\nOur unit price for {sku} has gone from {money(first_price, currency)} "
+            f"(your invoice of {day(first_date)}) to {money(last_price, currency)} (your invoice of {day(last_date)}), "
+            f"a rise of {pct}%. We value working with you and would like to keep ordering at a steady volume. "
+            f"Could we review this price, or agree a volume price, for upcoming orders? Please let us know what "
+            f"you can offer.\n\nKind regards,\n{business.name}")
     return Draft(subject, body)

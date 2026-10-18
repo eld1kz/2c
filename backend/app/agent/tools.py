@@ -55,6 +55,7 @@ from app.engine.whatif import (
 from app.policy.tiers import (
     TOOL_TIERS,
     SchedulePaymentParams,
+    SendPriceRequestParams,
     SendReminderParams,
     SendTermsRequestParams,
     SubmitLoanApplicationParams,
@@ -81,6 +82,8 @@ CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 NOT_SENT = "Draft only: nothing has been sent and no tool sends it on its own."
 REMINDER_NEXT = "Use send_reminder with this draft_id to propose sending it; a human approves before it goes out."
 TERMS_NEXT = ("Use send_terms_request with this draft_id to propose emailing it to the supplier's stored contact; "
+              "an owner approves before it goes out. Do not tell the user to send it themselves.")
+PRICE_NEXT = ("Use send_price_request with this draft_id to propose emailing it to the supplier's stored contact; "
               "an owner approves before it goes out. Do not tell the user to send it themselves.")
 AWAITING = "Awaiting human approval in the approvals inbox. You cannot approve it."
 DENIED = "The policy gate denied this proposal. Tell the user the reason; do not retry with changed figures."
@@ -182,6 +185,10 @@ class TermsRequestIn(_In):
     extension_days: int = Field(ge=7, le=60)
 
 
+class PriceRequestIn(_In):
+    counterparty_id: int
+
+
 class _Proposal(BaseModel):
     rationale: str = Field("", max_length=MAX_RATIONALE_CHARS, description="why, for the human approver")
     evidence_ids: list[str] = Field(default_factory=list, max_length=MAX_EVIDENCE_IDS,
@@ -193,6 +200,10 @@ class SendReminderIn(SendReminderParams, _Proposal):
 
 
 class SendTermsRequestIn(SendTermsRequestParams, _Proposal):
+    pass
+
+
+class SendPriceRequestIn(SendPriceRequestParams, _Proposal):
     pass
 
 
@@ -432,6 +443,11 @@ def _draft_terms_request(ctx: ToolContext, p: TermsRequestIn) -> dict[str, Any]:
     return {**ledger.action_dict(draft), "draft_id": draft.id, "note": NOT_SENT, "next_step": TERMS_NEXT}
 
 
+def _draft_price_request(ctx: ToolContext, p: PriceRequestIn) -> dict[str, Any]:
+    draft = ctx.service.record_price_draft(actor_for(ctx.user, via_agent=True), p.counterparty_id)
+    return {**ledger.action_dict(draft), "draft_id": draft.id, "note": NOT_SENT, "next_step": PRICE_NEXT}
+
+
 def _draft_cfo_memo(ctx: ToolContext, _: NoInput) -> dict[str, Any]:
     snap = ctx.snapshot()
     forecast = project(snap)
@@ -529,6 +545,9 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("draft_terms_request", "Draft a request asking a supplier for more days on payment terms, from a "
              "fixed template. Returns the draft (draft_id); nothing is sent. Use send_terms_request to propose "
              "sending it.", TermsRequestIn, _draft_terms_request),
+    ToolSpec("draft_price_request", "Draft a request asking a supplier to review a unit price that rose (from a "
+             "PRICE_CREEP insight), from a fixed template. Returns the draft (draft_id); nothing is sent. Use "
+             "send_price_request to propose sending it.", PriceRequestIn, _draft_price_request),
     ToolSpec("draft_cfo_memo", "Facts for this week's CFO memo: cash, the gap, top insights, pending approvals.",
              NoInput, _draft_cfo_memo),
     ToolSpec("send_reminder", "Propose emailing a reminder draft (from draft_reminder) to the customer's stored "
@@ -537,6 +556,9 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
     ToolSpec("send_terms_request", "Propose emailing a terms-request draft (from draft_terms_request) to the "
              "supplier's stored address. Creates a proposal that the owner must approve; it does not send anything.",
              SendTermsRequestIn, None),
+    ToolSpec("send_price_request", "Propose emailing a price-review draft (from draft_price_request) to the "
+             "supplier's stored address. Creates a proposal that the owner must approve; it does not send anything.",
+             SendPriceRequestIn, None),
     ToolSpec("schedule_payment", "Propose paying an open payable invoice of an existing, allowlisted "
              "counterparty, by ids only; amount in integer cents. Payment always goes to the counterparty's stored "
              "details. Creates a proposal that a human must approve.", SchedulePaymentIn, None),

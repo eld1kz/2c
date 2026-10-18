@@ -14,6 +14,7 @@ export const keys = {
   insights: ["insights"],
   budget: ["llm-budget"],
   pending: ["actions", "proposed"],
+  today: ["today"],
 } as const;
 
 export const useMe = () =>
@@ -68,6 +69,21 @@ export function useGenerateMemo() {
   });
 }
 
+export const useToday = () =>
+  useQuery({ queryKey: keys.today, queryFn: async () => unwrap(await api.GET("/today")) });
+
+/** Drafts and proposes a Today decision's action (no AI); a human still approves it. */
+export function usePrepare() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (insightId: number) =>
+      unwrap(await api.POST("/today/decisions/{insight_id}/prepare", { params: { path: { insight_id: insightId } } })),
+    onSettled: () => {
+      for (const key of [keys.today, keys.pending]) void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 export const useMonthClose = () =>
   useQuery({ queryKey: ["paperwork", "month-close"], queryFn: async () => unwrap(await api.GET("/paperwork/month-close")) });
 
@@ -110,7 +126,7 @@ export function useDecide() {
         ? unwrap(await api.POST("/actions/{action_id}/approve", { params: { path: { action_id: id } } }))
         : unwrap(await api.POST("/actions/{action_id}/reject", { params: { path: { action_id: id } } })),
     onSettled: () => {
-      for (const key of [["actions"], keys.position, keys.forecast, keys.insights]) {
+      for (const key of [["actions"], keys.position, keys.forecast, keys.insights, keys.today]) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
     },

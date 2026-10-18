@@ -19,6 +19,8 @@ CHIP_NOUNS = {
     "draft_reminder": "Reminder draft for",
     "send_terms_request": "Terms request to",
     "draft_terms_request": "Terms-request draft for",
+    "send_price_request": "Price review request to",
+    "draft_price_request": "Price-review draft for",
     "schedule_payment": "Payment to",
 }
 
@@ -56,6 +58,12 @@ def title(action: Action, name: str | None, draft: Action | None) -> str:
             supplier = name or "a supplier"
             return (f"Ask {supplier} for {terms}" if action.tool == "send_terms_request"
                     else f"Terms-request draft for {supplier}")
+        case "send_price_request" | "draft_price_request":
+            sku = (draft.result or {}).get("sku") if draft is not None else None
+            what = f"review the price of {sku}" if isinstance(sku, str) else "review a price"
+            supplier = name or "a supplier"
+            return (f"Ask {supplier} to {what}" if action.tool == "send_price_request"
+                    else f"Price-review draft for {supplier}")
         case "schedule_payment":
             return f"Pay {name}" if name else "Pay a supplier"
         case "submit_loan_application":

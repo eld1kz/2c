@@ -22,8 +22,10 @@ TOOL_TIERS: dict[str, Tier] = {
     "draft_reminder": Tier.SUGGEST,
     "draft_terms_request": Tier.SUGGEST,
     "draft_cfo_memo": Tier.SUGGEST,
+    "draft_price_request": Tier.SUGGEST,
     "send_reminder": Tier.EXECUTE,
     "send_terms_request": Tier.EXECUTE,
+    "send_price_request": Tier.EXECUTE,
     "schedule_payment": Tier.EXECUTE,
     "submit_loan_application": Tier.EXECUTE,
 }
@@ -43,6 +45,11 @@ class SendTermsRequestParams(_Closed):
     draft_id: StrictInt  # a draft_terms_request for that supplier (fixed template)
 
 
+class SendPriceRequestParams(_Closed):
+    counterparty_id: StrictInt  # the supplier; the email goes to its stored contact_email
+    draft_id: StrictInt  # a draft_price_request for that supplier (fixed template)
+
+
 class SchedulePaymentParams(_Closed):
     payee_counterparty_id: StrictInt
     invoice_id: StrictInt
@@ -58,6 +65,7 @@ class SubmitLoanApplicationParams(_Closed):
 EXECUTE_PARAMS: dict[str, type[_Closed]] = {
     "send_reminder": SendReminderParams,
     "send_terms_request": SendTermsRequestParams,
+    "send_price_request": SendPriceRequestParams,
     "schedule_payment": SchedulePaymentParams,
     "submit_loan_application": SubmitLoanApplicationParams,
 }

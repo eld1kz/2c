@@ -122,7 +122,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-ink-3">{me ? `Data as of ${formatDate(me.as_of)}` : " "}</p>
           </div>
           <nav className="mt-6 flex flex-col gap-0.5" aria-label="Main">
-            {NAV.map((item) => (
+            {NAV.filter((item) => !item.more).map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+            <p className="mt-5 mb-1 px-3 text-xs font-medium text-ink-3">More</p>
+            {NAV.filter((item) => item.more).map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
           </nav>

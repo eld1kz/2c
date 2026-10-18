@@ -107,6 +107,25 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
   - print hides the app chrome, and the footer rule carries the label;
   - `page.pdf()` produces the pack.
 
+## Phase 6c — Make it simple: Today  *(Oct 18)*
+- **6c-1:** `/today` is the home screen after sign-in. It has:
+  - the 3 largest open insights, each with one prepared action (reminder, price-review email via the new `draft_price_request` / `send_price_request`, terms request);
+  - safe to spend this week (cash − cushion − 7-day bills);
+  - last month's spending by category.
+
+  Navigation is Today · Ask · Approvals · More. 6b-2 was dropped in favour of this.
+- **6c-2:** "Can I afford it?" on Today: a question → the agent maps it to a what-if → an engine verdict (yes / not yet / no, with the earliest safe start) → a one-sentence cited answer and a before/after chart.
+
+**Acceptance (6c-1)**
+- `backend/tests/test_today.py`:
+  - golden decisions are PRICE_CREEP, CASH_GAP, LATE_PAYER;
+  - `GET /today` writes nothing and calls no model;
+  - safe to spend −$5,292.54 (rent, payroll, software this week);
+  - preparing proposes once and reuses;
+  - the price email is approved and sent to Verde's stored contact, with no document text;
+  - `send_price_request` gate denials; roles.
+- `frontend/e2e/today.spec.ts`: sign-in lands on Today; tap → approval sheet → approve; viewer has no buttons; nav reads Today · Ask · Approvals · More.
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 - Deploy: one Singapore VPS with Docker Compose (Caddy → Next.js → FastAPI → Postgres) and a custom domain, reachable from mainland China (SPEC §3). README with setup/deploy/tests.
 - Demo safety on the deployed instance (`APP_ENV=production`): automatic demo reset every 3 h (host cron, `seed.reset --scheduled`) plus the owner button, login-page note; `DAILY_LLM_BUDGET_USD=5` and a separate Anthropic key with a $50/month cap; per-IP limits at Caddy; demo accounts exempt from the email lockout; 300 chat turns/day; chat lock and conversations per sign-in session, not per user; boot refuses development defaults.

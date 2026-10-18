@@ -28,7 +28,7 @@ test("owner resets the demo behind a confirm dialog", async ({ page }, info) => 
   await open();
   await page.getByRole("alertdialog").getByRole("button", { name: "Reset demo data" }).click();
   await expect(page.getByText("Demo data reset.")).toBeVisible();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/today$/);
   expect(calls).toBe(1);
 });
 
