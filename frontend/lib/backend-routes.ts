@@ -19,7 +19,7 @@ const ALLOWED: Record<"GET" | "POST", RegExp[]> = {
     /^paperwork\/(month-close|bank-pack)$/,
     /^today$/,
   ],
-  POST: [/^chat$/, /^actions\/\d{1,12}\/(approve|reject)$/, /^transactions\/\d{1,12}\/category$/, /^upload$/, /^demo\/reset$/, /^whatif$/, /^financing$/, /^memo$/, /^today\/decisions\/\d{1,12}\/prepare$/],
+  POST: [/^chat$/, /^actions\/\d{1,12}\/(approve|reject)$/, /^transactions\/\d{1,12}\/category$/, /^upload$/, /^demo\/reset$/, /^whatif$/, /^financing$/, /^memo$/, /^today\/decisions\/\d{1,12}\/prepare$/, /^afford$/],
 };
 
 export function isAllowed(method: string, path: string): boolean {

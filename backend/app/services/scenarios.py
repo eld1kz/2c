@@ -11,7 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.db.models import Cadence
+from app.db.models import Cadence, Category
 from app.engine.insights.base import money
 from app.engine.whatif import (
     AddRecurring,
@@ -22,11 +22,15 @@ from app.engine.whatif import (
     Scenario,
     ScenarioError,
 )
+from app.engine.afford import Affordability, affordability
+from app.engine.forecast import project
+from app.engine.snapshot import SeriesFacts, Snapshot
 from app.services import ledger
 
 MAX_SCENARIO_CENTS = 100_000_000  # $1,000,000
 MAX_SCENARIO_DAYS = 91  # 13 weeks: the forecast horizon
 MAX_SCENARIOS = 5
+MAX_RAISE_PERCENT = 50
 
 
 class _In(BaseModel):
@@ -65,10 +69,30 @@ class RemoveSeriesIn(_In):
     series_id: int
 
 
-ScenarioIn = Annotated[CollectIn | DelayIn | AddRecurringIn | OneOffIn | RemoveSeriesIn, Field(discriminator="type")]
+class RaisePayrollIn(_In):
+    type: Literal["raise_payroll"]
+    percent: int = Field(ge=1, le=MAX_RAISE_PERCENT, description="whole percent, e.g. 5 for a 5% raise")
+    start: date
 
 
-def to_scenarios(items: list[ScenarioIn], today: date) -> list[Scenario]:
+ScenarioIn = Annotated[CollectIn | DelayIn | AddRecurringIn | OneOffIn | RemoveSeriesIn | RaisePayrollIn,
+                       Field(discriminator="type")]
+
+
+AffordScenarioIn = Annotated[AddRecurringIn | OneOffIn | RaisePayrollIn, Field(discriminator="type")]
+
+
+def payroll_raise(series: tuple[SeriesFacts, ...], percent: int, start: date) -> list[Scenario]:
+    """A raise as extra recurring payroll: each detected payroll series × percent, computed here in cents
+    (rounded towards zero), so nobody else does the arithmetic. No staff records exist (SPEC §2)."""
+    payroll = [s for s in series if s.category == Category.payroll]
+    if not payroll:
+        raise ScenarioError("no recurring payroll found to raise")
+    return [AddRecurring(-(abs(s.amount) * percent // 100), s.cadence, start) for s in payroll]
+
+
+def to_scenarios(items: list[ScenarioIn], today: date, series: tuple[SeriesFacts, ...] = ()) -> list[Scenario]:
+    """`series` (the snapshot's active recurring series) is needed only for raise_payroll."""
     out: list[Scenario] = []
     for s in items:
         match s:
@@ -82,6 +106,8 @@ def to_scenarios(items: list[ScenarioIn], today: date) -> list[Scenario]:
                 out.append(OneOff(s.amount_cents, s.on))
             case RemoveSeriesIn():
                 out.append(RemoveSeries(s.series_id))
+            case RaisePayrollIn():
+                out.extend(payroll_raise(series, s.percent, s.start))
     return out
 
 
@@ -103,3 +129,14 @@ def check_targets(session: Session, business_id: int, currency: str, today: date
             continue
         if not ledger.record_exists(session, business_id, ref):
             raise ScenarioError(f"{ref} not found")
+
+
+def assess(session: Session, snap: Snapshot, today: date, item: AddRecurringIn | OneOffIn | RaisePayrollIn) -> Affordability:
+    """The engine verdict for one plan (ScenarioError on a bad date, amount or missing payroll)."""
+    field = "on" if isinstance(item, OneOffIn) else "start"
+
+    def at(day: date) -> list[Scenario]:
+        return to_scenarios([item.model_copy(update={field: day})], today, snap.series)
+
+    check_targets(session, snap.business_id, snap.currency, today, at(getattr(item, field)))
+    return affordability(project(snap), at, getattr(item, field))

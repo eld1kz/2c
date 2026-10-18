@@ -47,6 +47,9 @@ but nothing sends it. The only supplier email the app can send is the Phase 6 te
 | Safe to spend = cash − cushion − this week's bills | `backend/tests/test_today.py::test_safe_to_spend_is_cash_minus_cushion_minus_this_weeks_bills`, `backend/tests/test_today.py::test_supplier_bills_due_this_week_count` |
 | One tap prepares the action once; roles decide who may | `backend/tests/test_today.py::test_preparing_a_reminder_proposes_it_once`, `backend/tests/test_today.py::test_roles_for_preparing`, `frontend/e2e/today.spec.ts::"one tap prepares the reminder and opens it for approval"` |
 | P3 price-review email: fixed template, stored contact, gated | `backend/tests/test_today.py::test_price_email_is_drafted_from_records_and_sent_to_the_stored_contact`, `backend/tests/test_today.py::test_price_request_gate` |
+| Can I afford it: the verdict is the engine's (yes / not yet / no) | `backend/tests/test_afford.py::test_yes_when_no_week_dips_below_the_cushion`, `backend/tests/test_afford.py::test_not_yet_gives_the_first_safe_start`, `backend/tests/test_afford.py::test_no_when_nothing_in_13_weeks_works`, `backend/tests/test_afford.py::test_golden_barista_is_no_because_cash_is_already_short` |
+| A raise is computed by the engine; the owner's amount is never evidence | `backend/tests/test_afford.py::test_a_raise_is_computed_by_the_engine`, `backend/tests/test_afford.py::test_the_tool_never_counts_the_supplied_amount_as_evidence` |
+| The badge keeps the engine verdict; viewers and the budget are refused before the model | `backend/tests/test_afford.py::test_the_badge_keeps_the_engine_verdict_when_the_text_disagrees`, `backend/tests/test_afford.py::test_viewer_cannot_ask_and_the_model_is_not_called`, `backend/tests/test_afford.py::test_afford_respects_the_daily_ai_budget`, `frontend/e2e/today.spec.ts::"can I afford it: a chip asks, the engine verdict, a cited sentence and the chart"` |
 
 ## Paperwork Center (Phase 6b)
 

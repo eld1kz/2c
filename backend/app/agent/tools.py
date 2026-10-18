@@ -64,7 +64,7 @@ from app.services import ledger
 from app.services.action_service import ActionError, ActionService, actor_for
 from app.services.drafts import Tone
 from app.services.ledger import UntrustedText
-from app.services.scenarios import MAX_SCENARIOS, ScenarioIn, check_targets, to_scenarios
+from app.services.scenarios import MAX_SCENARIOS, AffordScenarioIn, ScenarioIn, assess, check_targets, to_scenarios
 
 MAX_UNTRUSTED_CHARS = 600
 MAX_RATIONALE_CHARS = 500
@@ -173,6 +173,10 @@ class WhatIfIn(_In):
 class FinancingIn(_In):
     scenarios: list[ScenarioIn] = Field(default_factory=list, max_length=MAX_SCENARIOS,
                                         description="rank the gap left after these what-if scenarios (default: none)")
+
+
+class AffordIn(_In):
+    scenario: AffordScenarioIn
 
 
 class DraftReminderIn(_In):
@@ -375,7 +379,7 @@ def _explain_record(ctx: ToolContext, p: ExplainIn) -> dict[str, Any]:
 
 
 def _run_what_if(ctx: ToolContext, p: WhatIfIn) -> dict[str, Any]:
-    scenarios = to_scenarios(p.scenarios, ctx.today)
+    scenarios = to_scenarios(p.scenarios, ctx.today, ctx.snapshot().series)
     check_targets(ctx.session, ctx.business.id, ctx.business.base_currency, ctx.today, scenarios)
     base = project(ctx.snapshot())
     result = run_what_if(base, scenarios)
@@ -405,7 +409,7 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
     forecast = project(snap)
     _register_weeks(ctx, forecast)
     if p.scenarios:
-        scenarios = to_scenarios(p.scenarios, ctx.today)
+        scenarios = to_scenarios(p.scenarios, ctx.today, snap.series)
         check_targets(ctx.session, ctx.business.id, ctx.business.base_currency, ctx.today, scenarios)
         forecast = run_what_if(forecast, scenarios).scenario
     gap = forecast.gap()
@@ -430,6 +434,34 @@ def _rank_financing(ctx: ToolContext, p: FinancingIn) -> dict[str, Any]:
     gap_info = _gap(gap) if p.scenarios else _base_gap(forecast)
     gap_info["evidence_ids"] = [*gap_info.get("evidence_ids", []), *(o["ref"] for o in options)]  # ranked for it
     return {"based_on": based_on, "gap": gap_info, "options": options, "disclaimer": ranking.disclaimer}
+
+
+def _check_affordability(ctx: ToolContext, p: AffordIn) -> dict[str, Any]:
+    snap = ctx.snapshot()
+    verdict = assess(ctx.session, snap, ctx.today, p.scenario)
+    base, with_it = verdict.result.base, verdict.result.scenario
+    ctx.memory.whatif_runs += 1
+    ref = f"whatif:{ctx.memory.whatif_runs}"
+    ctx.memory.index.add_computed(ref, f"What-if {ctx.memory.whatif_runs}")
+    _register_weeks(ctx, base)
+    first_below = next((w for w in base.weeks if w.below_buffer), None)
+    low = min(with_it.weeks, key=lambda w: (w.closing, w.week))
+    return {
+        "ref": ref, "label": f"What-if {ctx.memory.whatif_runs}",
+        "verdict": verdict.verdict, "requested_start": verdict.requested_start.isoformat(),
+        "earliest_safe_start": verdict.earliest_safe_start.isoformat() if verdict.earliest_safe_start else None,
+        "supplied_input": {"scenario": p.scenario.model_dump(mode="json")},
+        "min_cash_buffer_cents": base.min_cash_buffer,
+        "already_below_cushion_without_it": None if first_below is None else {
+            "ref": f"forecast_week:{first_below.week}", "label": week_label(first_below.week, first_below.start),
+            "closing_cents": first_below.closing, "cushion_cents": base.min_cash_buffer},
+        "weeks_below_cushion_with_it": list(verdict.weeks_below_with_it),
+        "lowest_week_with_it": {"week": low.week, "label": week_label(low.week, low.start),
+                                "scenario_closing_cents": low.closing},
+        "rule": "Safe means no week of the 13-week forecast closes below the cushion. yes: safe as asked; not_yet: "
+                "safe from earliest_safe_start; no: no start within 13 weeks is safe.",
+        "note": "A simulation only; nothing in the books was changed.",
+    }
 
 
 def _draft_reminder(ctx: ToolContext, p: DraftReminderIn) -> dict[str, Any]:
@@ -539,6 +571,10 @@ TOOLS: dict[str, ToolSpec] = {spec.name: spec for spec in (
              "invoice factoring, supplier terms extension, early-payment discount) by cost. The gap comes from "
              "the forecast, optionally after what-if scenarios; you never pass an amount.",
              FinancingIn, _rank_financing, cents=True),
+    ToolSpec("check_affordability", "Can the business afford a new cost? Give one scenario: add_recurring (a hire or "
+             "other new regular cost), raise_payroll (a staff raise in whole percent) or one_off (a purchase). Returns "
+             "the forecast's verdict (yes / not_yet / no), the earliest safe start and the weeks below the cushion. "
+             "Changes nothing.", AffordIn, _check_affordability),
     ToolSpec("draft_reminder", "Draft a payment reminder for an open receivable from a fixed template. Returns "
              "the draft (draft_id); nothing is sent. Use send_reminder to propose sending it.",
              DraftReminderIn, _draft_reminder),
@@ -645,7 +681,9 @@ def dispatch(ctx: ToolContext, name: str, tool_input: Any) -> ToolOutcome:
     ctx.memory.index.add_result(shown)
     _audit_call(ctx, name, tier, tool_input, True, action)
     scenarios = ([sc.model_dump(mode="json", exclude_none=True) for sc in parsed.scenarios]
-                 if isinstance(parsed, (WhatIfIn, FinancingIn)) else None)
+                 if isinstance(parsed, (WhatIfIn, FinancingIn))
+                 else [parsed.scenario.model_dump(mode="json", exclude_none=True)] if isinstance(parsed, AffordIn)
+                 else None)
     return ToolOutcome(_result(name, True, {"data": shown}), False, tier, action, scenarios)
 
 

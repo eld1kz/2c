@@ -5,7 +5,7 @@ import type { Schemas } from "@/lib/api/client";
 
 export type ScenarioInput = Schemas["WhatIfIn"]["scenarios"][number];
 
-const TYPES = new Set(["collect_receivable", "delay_receivable", "add_recurring", "one_off", "remove_series"]);
+const TYPES = new Set(["collect_receivable", "delay_receivable", "add_recurring", "one_off", "remove_series", "raise_payroll"]);
 const MAX_SCENARIOS = 5;
 
 /** "invoice:30" → collect it now. */

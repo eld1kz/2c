@@ -157,7 +157,7 @@ Group by (counterparty, category). ≥3 occurrences (≥2 for quarterly, since 6
 - Output: weekly opening, inflows, outflows, closing, and `below_buffer` flag.
 
 ### 6.5 What-if
-Same forecast function + scenario adjustments (add recurring cost/revenue from date, delay a receivable N days, remove a series, one-off payment), added as signed `scenario` lines; base lines are never changed. Returns baseline vs scenario diff. Never mutates real data. Inputs are ids, dates, enums and integer cents only (no free text): dates within the 13-week horizon, typed-in amounts non-zero and ≤ $1,000,000, targets in the caller's business.
+Same forecast function + scenario adjustments (add recurring cost/revenue from date, delay a receivable N days, remove a series, one-off payment, raise payroll by a whole percent), added as signed `scenario` lines; base lines are never changed. Returns baseline vs scenario diff. Never mutates real data. Inputs are ids, dates, enums and integer cents only (no free text): dates within the 13-week horizon, typed-in amounts non-zero and ≤ $1,000,000, targets in the caller's business.
 
 ### 6.6 Insights catalog (each returns impact_amount + evidence_ids)
 | Type | Rule |
@@ -203,6 +203,13 @@ Cash basis throughout: income is money received and expenses are money paid in t
   Opening Today writes nothing and calls no model. Tapping the button drafts from the fixed template and proposes the EXECUTE action through ActionService, with the signed-in person as proposer (owner; accountant for reminders). A waiting proposal for the same target is reused, and a decision whose email went out within the cooldown shows "Sent".
 - **Safe to spend this week** = cash now − cushion (`min_cash_buffer`) − bills due in the next 7 days. Bills are recurring-series payments and open supplier invoices in forecast week 1, overdue ones included. Expected money in and typical spending are not counted. Below zero, Today says nothing is safe to spend and by how much the cushion is short.
 - **Where your money went:** last month's COGS and operating expenses from the cash-basis P&L (§6.8), largest first, linking to the full P&L.
+- **Can I afford it?** (`engine/afford.py`, `services/afford.py`, `POST /afford`): one free-text question.
+  - The agent maps it to one scenario: a hire or other new regular cost → `add_recurring`; a staff raise → `raise_payroll(percent, start)`, where the engine scales the detected payroll series in cents and no staff data exists; a purchase → `one_off`.
+  - It calls `check_affordability` and answers in one cited sentence that starts with the verdict.
+  - The verdict is the engine's. A plan is safe when no week of the 13-week forecast closes below the cushion. **Yes** = safe as asked; **Not yet** = safe from a later week start inside the horizon (the earliest is given); **No** = no start within 13 weeks is safe.
+  - The API recomputes the verdict from the validated scenario and returns it for the badge. An answer that doesn't open with it carries a warning.
+  - Same admission, citation and claim checks as chat; only `check_affordability` is offered; owner/accountant only; nothing is stored. A before/after chart comes from `POST /whatif`.
+  - On the golden data every plan is No, because cash is already below the cushion from week 6.
 
 ## 7. Agent
 
@@ -214,7 +221,7 @@ Cash basis throughout: income is money received and expenses are money paid in t
 | Tier | Tool | Notes |
 |---|---|---|
 | READ | `get_cash_position`, `get_ledger(filters)`, `get_forecast`, `get_insights`, `explain_record(id)` | auto |
-| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_price_request(counterparty_id)`, `draft_cfo_memo()` | auto; outputs are drafts, never sent by themselves (`draft_terms_request`: supplier payment-terms request from a fixed template) |
+| SUGGEST | `run_what_if(scenario)`, `rank_financing(gap)`, `check_affordability(scenario)`, `draft_reminder(invoice_id, tone)`, `draft_terms_request(counterparty_id, extension_days)`, `draft_price_request(counterparty_id)`, `draft_cfo_memo()` | auto; outputs are drafts, never sent by themselves (`draft_terms_request`: supplier payment-terms request from a fixed template) |
 | EXECUTE | `send_reminder(invoice_id, draft_id)`, `send_terms_request(counterparty_id, draft_id)`, `send_price_request(counterparty_id, draft_id)`, `schedule_payment(payee_counterparty_id, invoice_id, amount, date)`, `submit_loan_application(option_id, amount)` | creates Action `proposed` → needs approval → executed via ActionService |
 
 The agent has **no** approve tool. Approvals come only from an authenticated human via API.
@@ -273,7 +280,7 @@ Fictional vendor names only (no real brands).
 ---
 
 ## 10. Frontend pages
-- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went. Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
+- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went, and (owner/accountant) a "Can I afford it?" box with three example chips (a hire, a 5% raise, an espresso machine). Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
 - `/dashboard` — cash now, 13-week chart with buffer line, top 3 insights, pending approvals count
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button

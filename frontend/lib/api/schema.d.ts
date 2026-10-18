@@ -448,6 +448,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/afford": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask */
+        post: operations["ask_afford_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -588,6 +605,28 @@ export interface components {
              * Format: date
              */
             start: string;
+        };
+        /** AffordAskIn */
+        AffordAskIn: {
+            /** Question */
+            question: string;
+        };
+        /** AffordOut */
+        AffordOut: {
+            /** Verdict */
+            verdict: ("yes" | "not_yet" | "no") | null;
+            /** Earliest Safe Start */
+            earliest_safe_start: string | null;
+            /** Message */
+            message: string;
+            /** Citations */
+            citations: components["schemas"]["CitationOut"][];
+            /** Warnings */
+            warnings: string[];
+            /** Scenarios */
+            scenarios: {
+                [key: string]: unknown;
+            }[];
         };
         /** AgingOut */
         AgingOut: {
@@ -824,7 +863,7 @@ export interface components {
         /** FinancingIn */
         FinancingIn: {
             /** Scenarios */
-            scenarios?: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"])[];
+            scenarios?: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"] | components["schemas"]["RaisePayrollIn"])[];
         };
         /** FinancingOptionOut */
         FinancingOptionOut: {
@@ -1231,6 +1270,24 @@ export interface components {
             /** Transaction Count */
             transaction_count: number;
         };
+        /** RaisePayrollIn */
+        RaisePayrollIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "raise_payroll";
+            /**
+             * Percent
+             * @description whole percent, e.g. 5 for a 5% raise
+             */
+            percent: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
         /** ReconciliationOut */
         ReconciliationOut: {
             period: components["schemas"]["PeriodOut"];
@@ -1463,7 +1520,7 @@ export interface components {
         /** WhatIfIn */
         WhatIfIn: {
             /** Scenarios */
-            scenarios: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"])[];
+            scenarios: (components["schemas"]["CollectIn"] | components["schemas"]["DelayIn"] | components["schemas"]["AddRecurringIn"] | components["schemas"]["OneOffIn"] | components["schemas"]["RemoveSeriesIn"] | components["schemas"]["RaisePayrollIn"])[];
         };
         /** WhatIfOut */
         WhatIfOut: {
@@ -2275,6 +2332,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_afford_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffordAskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffordOut"];
                 };
             };
             /** @description Validation Error */

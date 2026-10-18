@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useToday } from "@/lib/api/hooks";
 import { formatDate } from "@/lib/money";
 
+import { AffordBox } from "./afford-box";
 import { DecisionCard } from "./decision-card";
 import { MoneyGoes } from "./money-goes";
 import { SafeToSpend } from "./safe-to-spend";
@@ -28,6 +29,7 @@ export function TodayView() {
           <DecisionCard key={d.insight.ref} decision={d} role={me.data.user.role} />
         ))}
       </section>
+      {me.data.user.role !== "viewer" && <AffordBox />}
       <SafeToSpend safe={data.safe_to_spend} currency={data.currency} />
       <MoneyGoes spending={data.spending} currency={data.currency} />
     </div>

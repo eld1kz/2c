@@ -24,7 +24,7 @@ from app.services.action_service import Forbidden
 from tests.conftest import Demo
 
 READ = ["get_cash_position", "get_ledger", "get_forecast", "get_insights", "explain_record"]
-SUGGEST = ["run_what_if", "rank_financing", "draft_reminder", "draft_terms_request", "draft_price_request",
+SUGGEST = ["run_what_if", "rank_financing", "check_affordability", "draft_reminder", "draft_terms_request", "draft_price_request",
            "draft_cfo_memo"]
 
 
@@ -44,7 +44,7 @@ def _sandbox_rows(demo: Demo) -> int:
 
 
 def test_registry_matches_the_tier_table() -> None:
-    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 16
+    assert set(TOOLS) == set(TOOL_TIERS) and len(TOOLS) == 17
     assert TOOLS["send_terms_request"].tier == TOOLS["send_price_request"].tier == Tier.EXECUTE
     assert TOOLS["draft_terms_request"].tier == Tier.SUGGEST
     assert [n for n, s in TOOLS.items() if s.tier == Tier.READ] == READ

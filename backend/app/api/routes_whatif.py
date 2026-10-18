@@ -62,8 +62,8 @@ def require_simulation_role(session: Session, user: User, tool: str) -> None:
 def simulate(session: Session, user: User, body: WhatIfIn | FinancingIn, settings: Settings) -> tuple[Snapshot, list[Scenario]]:
     """The caller's snapshot and the checked scenarios (422 on a bad target or value)."""
     snap = load_snapshot(session, user.business_id, settings.demo_today)
-    scenarios = to_scenarios(body.scenarios, settings.demo_today)
     try:
+        scenarios = to_scenarios(body.scenarios, settings.demo_today, snap.series)
         check_targets(session, user.business_id, snap.currency, settings.demo_today, scenarios)
     except ScenarioError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None

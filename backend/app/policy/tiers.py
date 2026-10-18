@@ -19,6 +19,7 @@ TOOL_TIERS: dict[str, Tier] = {
     "explain_record": Tier.READ,
     "run_what_if": Tier.SUGGEST,
     "rank_financing": Tier.SUGGEST,
+    "check_affordability": Tier.SUGGEST,
     "draft_reminder": Tier.SUGGEST,
     "draft_terms_request": Tier.SUGGEST,
     "draft_cfo_memo": Tier.SUGGEST,

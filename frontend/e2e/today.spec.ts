@@ -88,3 +88,39 @@ test("navigation is Today, Ask, Approvals and More", async ({ page }, info) => {
     await expect(side.getByText("More", { exact: true })).toBeVisible();
   }
 });
+
+test("can I afford it: a chip asks, the engine verdict, a cited sentence and the chart", async ({ page }, info) => {
+  const errors = watchConsole(page);
+  await signIn(page, "owner");
+  let asked = "";
+  await page.route("**/api/backend/afford", async (route) => {
+    asked = (route.request().postDataJSON() as { question: string }).question;
+    return route.fulfill({
+      json: {
+        verdict: "no", earliest_safe_start: null, warnings: [],
+        message: "No: your cash already falls below your $5,000.00 cushion in Week 6 (Nov 5) [[forecast_week:6]], before any new cost.",
+        citations: [{ ref: "forecast_week:6", valid: true, label: "Week 6 (Nov 5)", reason: null }],
+        scenarios: [{ type: "add_recurring", amount_cents: -250_000, cadence: "monthly", start: "2026-11-01" }],
+      },
+    });
+  });
+  const box = page.getByRole("region", { name: "Can I afford it?" });
+  await expect(box.getByRole("textbox", { name: "Can I afford it?" })).toHaveAttribute("placeholder", "Hire a barista at $2,500/month from November?");
+  await box.getByRole("button", { name: "Hire a barista at $2,500/month from November?" }).click();
+  const result = box.getByTestId("afford-result");
+  await expect(result.getByText("No", { exact: true })).toBeVisible();
+  await expect(result).toContainText("falls below your $5,000.00 cushion");
+  await expect(result.getByRole("button", { name: "Week 6 (Nov 5)" })).toBeVisible();
+  await expect(result.getByRole("region", { name: "What-if result" })).toBeVisible();
+  expect(asked).toBe("Hire a barista at $2,500/month from November?");
+  await expect(box.getByRole("textbox")).toHaveValue(asked);
+  await page.screenshot({ path: `e2e/.results/afford-${info.project.name}.png`, fullPage: true });
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test("viewers get no afford box", async ({ page }) => {
+  await signIn(page, "viewer");
+  await expect(page.getByRole("region", { name: "Decisions" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Can I afford it?" })).toHaveCount(0);
+});

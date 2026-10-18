@@ -570,3 +570,24 @@ class TodayOut(BaseModel):
     decisions: list[TodayDecisionOut]
     safe_to_spend: SafeToSpendOut
     spending: SpendingOut
+
+
+class AffordAskIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=3, max_length=300)
+
+    @field_validator("question")
+    @classmethod
+    def _unicode(cls, value: str) -> str:
+        if json_problem(value):
+            raise ValueError("text is not valid Unicode")
+        return value
+
+
+class AffordOut(BaseModel):
+    verdict: Literal["yes", "not_yet", "no"] | None  # from the engine; None if no plan could be checked
+    earliest_safe_start: date | None
+    message: str  # one sentence, markdown with [[type:id]] citations
+    citations: list[CitationOut]
+    warnings: list[str]
+    scenarios: list[dict[str, Any]]  # the checked plan, for the before/after chart (POST /whatif)

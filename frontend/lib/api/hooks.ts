@@ -84,6 +84,15 @@ export function usePrepare() {
   });
 }
 
+/** "Can I afford it?": one agent turn (spends AI budget); the verdict comes from the engine. */
+export function useAfford() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (question: string) => unwrap(await api.POST("/afford", { body: { question } })),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: keys.budget }),
+  });
+}
+
 export const useMonthClose = () =>
   useQuery({ queryKey: ["paperwork", "month-close"], queryFn: async () => unwrap(await api.GET("/paperwork/month-close")) });
 

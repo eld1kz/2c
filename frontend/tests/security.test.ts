@@ -18,6 +18,7 @@ describe("backend proxy allowlist", () => {
     ["GET", "paperwork/bank-pack"],
     ["GET", "today"],
     ["POST", "today/decisions/4/prepare"],
+    ["POST", "afford"],
   ])("allows %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(true));
 
   it.each([
@@ -33,6 +34,7 @@ describe("backend proxy allowlist", () => {
     ["GET", "paperwork/other"],
     ["POST", "today"],
     ["GET", "today/decisions/4/prepare"],
+    ["GET", "afford"],
   ])("refuses %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(false));
 });
 
