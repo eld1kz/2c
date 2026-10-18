@@ -16,7 +16,7 @@ Every feature must feed one of these rows. If it doesn't, it's out.
 |---|---|
 | Task completion (40%) | Golden demo: agent finds and fixes 4 planted problems end to end |
 | Security & compliance (30%) | Policy gate, permission tiers, hash-chained audit log, PII masking, injection defense, RBAC |
-| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, approvals inbox (mobile) |
+| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) |
 | Execution evidence | Sandbox bank writes its own logs; export script produces JSONL evidence |
 | Test cases | Golden dataset + adversarial tests (same scenarios as the demo) |
 | Security self-assessment | `docs/threat-model.md`, grown alongside the code |
@@ -44,6 +44,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 - Hash-chained audit log + verify endpoint
 - Weekly CFO memo (generated in-app; email send was optional and is not built)
 - RBAC: owner / accountant / viewer
+- Paperwork Center (Phase 6b): cash-basis month-close reports and a printable bank-ready pack (§6.8). No balance sheet, no tax filing
 
 ### Explicitly OUT of scope — do not build
 Real bank connections, real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
@@ -75,7 +76,8 @@ Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so f
     db/            models.py, session.py, migrations/ (alembic)
     ingestion/     csv_parser.py, normalizer.py, pipeline.py
     engine/        snapshot.py, categorize.py, llm_classifier.py, recurring.py, counterparty_stats.py,
-                   invoice_cycles.py, position.py, forecast.py, whatif.py, financing.py, memo.py, refresh.py
+                   invoice_cycles.py, position.py, forecast.py, whatif.py, financing.py, memo.py, statements.py,
+                   refresh.py
     engine/insights/  late_payer.py, duplicate_subscription.py, price_creep.py,
                       cash_gap.py, unusual_expense.py, registry.py
     policy/        tiers.py, gate.py, limits.py
@@ -89,7 +91,7 @@ Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so f
   seed/            generate_golden.py, load.py, reset.py, golden/ (generated CSVs + JSON)
   tests/
 /frontend
-  app/  dashboard, transactions, insights, chat, approvals, audit, upload, memo, what-if, login
+  app/  dashboard, transactions, insights, chat, approvals, audit, upload, memo, what-if, paperwork, login
   app/api/  auth (session cookie), backend/[...path] (same-origin gateway)
 /deploy            production Docker Compose, Caddyfile, cron, env template, bootstrap
 /scripts           ship.sh, deploy.sh, check_deploy.sh, fetch_evidence.sh
@@ -109,7 +111,7 @@ All money stored as integer **minor units** (cents) + `currency` (ISO 4217). Nev
 - **User** — id, business_id, email, name, role (`owner|accountant|viewer`), password_hash
 - **Account** — id, business_id, name, type (`checking|savings|cash`), currency, opening_balance
 - **Counterparty** — id, business_id, name, normalized_name, kind (`customer|supplier|both`), is_allowed_payee (bool), contact_email? (reminders and terms requests go only here; never sent to the browser or the LLM), stats(json: avg_days_late, invoices_count, on_time_rate)
-- **Transaction** — id, account_id, date, amount (signed), currency, raw_description, counterparty_id?, category, category_source (`rule|llm|human`), confidence, needs_review, source_file, invoice_id?
+- **Transaction** — id, account_id, date, amount (signed), currency, raw_description, counterparty_id?, category, category_source (`rule|llm|human`), confidence, needs_review, source_file, invoice_id?, statement_balance? (the running balance printed on the bank CSV row: untrusted, only compared in the bank reconciliation)
 - **CategoryRule** — id, business_id, kind (`keyword|name`), pattern, direction (`in|out|any`), category, source (`seed|human`), priority
 - **Invoice** — id, business_id, direction (`receivable|payable`), counterparty_id, number, issue_date, due_date, total, currency, status (`open|paid|overdue|void`), notes (UNTRUSTED text)
 - **InvoiceLine** — id, invoice_id, description, sku?, quantity, unit_price
@@ -172,6 +174,23 @@ Severity for annualized impacts (DUPLICATE_SUBSCRIPTION, PRICE_CREEP): high ≥ 
 Sandbox catalog (simulated terms): overdraft (18% APR, $15,000 limit), invoice factoring (85% advance, 2.5% fee per 30 days), short-term loan (12% APR, 91-day minimum, $50,000 max), supplier terms extension (+30 days, cost 0, only for suppliers with ≥3 invoices and ≥90% paid on time), accelerate receivables (cost = 2% early-pay discount). Takes a gap from the base forecast or from a what-if result (receivables/payables a scenario already moved are not offered again). For each option compute the effective cost in cents and how much of the gap it can cover; options that cover the whole gap rank first, then by cost ascending. Return pros/cons + "not financial advice".
 
 ---
+
+### 6.8 Statements (Paperwork Center, `engine/statements.py`)
+Cash basis throughout: income is money received and expenses are money paid in the period; nothing is accrued, and there is no balance sheet. Every page carries the label "Prepared from your records for review; not audited; not tax or legal advice."
+- **Close my month** covers the full calendar month before `DEMO_TODAY` (Sept 2026):
+  - **Bank reconciliation**, per account: book opening, money in/out and book closing, against the statement closing balance (the last CSV row's running balance; "not provided" if the file had none), with the difference. The month's `needs_review` transactions are listed as items to check.
+  - **P&L**: income (`revenue_*`), COGS (`cogs_*`), gross profit, operating expenses (one line per category), other income, net profit. `other` and uncategorized rows are split by direction (outflows under expenses, inflows under other income). Transfers are excluded from profit.
+  - **Cash-flow statement** (direct method): opening, operating in/out, transfers, net change and closing.
+  - **AR/AP aging** of open invoices at `DEMO_TODAY`, in the buckets current / 1–30 / 31–60 / 61–90 / 90+ days past due.
+  - Invariants (tested to the cent): every transaction in the period lands in exactly one P&L line or in transfers; net profit + transfers = closing − opening; book closing = cash-flow closing = dashboard cash; aging totals = open outstanding.
+- **Bank-ready pack** contains:
+  - P&L and cash flow for the last 3 full months (monthly columns + total);
+  - the 13-week forecast (§6.4);
+  - a **fixed-obligations schedule**: the forecast's own recurring rent and equipment-lease lines. It is not a loan statement, since there is no principal or interest data;
+  - AR aging;
+  - a "Not included" section (balance sheet, tax returns, legal documents).
+
+  It is printed to one PDF by the browser.
 
 ## 7. Agent
 
@@ -249,6 +268,7 @@ Fictional vendor names only (no real brands).
 - `/audit` — event list + "Verify chain" button
 - `/upload` — CSV upload with preview
 - `/memo` — weekly CFO memo: written on demand by the agent from engine facts (`draft_cfo_memo` only), every figure cited; only a fully cited memo is cached (viewing never calls the model), a notice shows when the facts changed since; owner/accountant write it, every role reads it; demo reset clears it
+- `/paperwork` — Paperwork Center (§6.8): "Close my month" (reconciliation, P&L, cash flow, AR/AP aging) and "Get bank-ready" (3-month P&L and cash flow, 13-week forecast, fixed obligations, AR aging, Not included; Download PDF via the browser's print). Every role reads; nothing calls the model
 - `/what-if` — before/after 13-week forecast for a scenario (from a chat what-if or the cash-gap card); scenario inputs shown as assumptions, never as verified figures; financing comparison for the base gap and the gap left after the scenario. Owner/accountant (viewers: READ only)
 
 Seeded demo users: owner@emberoak.demo, accountant@emberoak.demo, viewer@emberoak.demo.

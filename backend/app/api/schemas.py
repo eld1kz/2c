@@ -401,3 +401,125 @@ class MemoBody(BaseModel):
 class MemoOut(BaseModel):
     memo: MemoBody | None  # this week's stored memo, if any
     stale: bool  # the facts it was written from have changed since
+
+
+# --- paperwork (SPEC §6.8): cash-basis statements; integers from engine/statements.py -----
+
+
+class PeriodOut(BaseModel):
+    start: date
+    end: date
+    label: str
+
+
+class PnlLineOut(BaseModel):
+    key: str  # a category or "uncategorized"
+    amount_cents: int  # revenue/other income: received; cogs/expenses: paid
+    count: int
+
+
+class ProfitAndLossOut(BaseModel):
+    period: PeriodOut
+    revenue: list[PnlLineOut]
+    cogs: list[PnlLineOut]
+    operating_expenses: list[PnlLineOut]
+    other_income: list[PnlLineOut]
+    total_revenue_cents: int
+    total_cogs_cents: int
+    gross_profit_cents: int
+    total_operating_expenses_cents: int
+    total_other_income_cents: int
+    net_profit_cents: int
+    transfers_cents: int  # signed, excluded from profit
+    transaction_count: int
+
+
+class CashFlowOut(BaseModel):
+    period: PeriodOut
+    opening_cents: int
+    operating_in_cents: int
+    operating_out_cents: int
+    net_operating_cents: int
+    transfers_cents: int
+    net_change_cents: int
+    closing_cents: int
+
+
+class AccountReconciliationOut(BaseModel):
+    account: EvidenceRef
+    book_opening_cents: int
+    money_in_cents: int
+    money_out_cents: int
+    book_closing_cents: int
+    statement_closing_cents: int | None  # None: the statement had no running balance
+    statement_date: date | None
+    difference_cents: int | None
+    to_review: list[EvidenceRef]
+
+
+class ReconciliationOut(BaseModel):
+    period: PeriodOut
+    accounts: list[AccountReconciliationOut]
+    book_opening_cents: int
+    book_closing_cents: int
+    reconciled: bool
+
+
+class AgingRowOut(BaseModel):
+    invoice: EvidenceRef
+    number: str
+    counterparty: EvidenceRef
+    due_date: date
+    days_past_due: int
+    outstanding_cents: int
+    bucket: str
+
+
+class AgingOut(BaseModel):
+    direction: str
+    as_of: date
+    rows: list[AgingRowOut]
+    totals_cents: dict[str, int]  # current, 1_30, 31_60, 61_90, over_90
+    total_cents: int
+
+
+class ObligationOut(BaseModel):
+    date: date
+    week: int
+    series: EvidenceRef
+    counterparty: EvidenceRef
+    category: str
+    amount_cents: int
+
+
+class ObligationsOut(BaseModel):
+    rows: list[ObligationOut]
+    total_cents: int
+
+
+class MonthCloseOut(BaseModel):
+    as_of: date
+    currency: str
+    basis: str
+    disclaimer: str
+    period: PeriodOut
+    reconciliation: ReconciliationOut
+    profit_and_loss: ProfitAndLossOut
+    cash_flow: CashFlowOut
+    receivables: AgingOut
+    payables: AgingOut
+
+
+class BankPackOut(BaseModel):
+    as_of: date
+    currency: str
+    business_name: str
+    basis: str
+    disclaimer: str
+    months: list[PeriodOut]
+    profit_and_loss: list[ProfitAndLossOut]  # one per month, then the whole span
+    cash_flow: list[CashFlowOut]  # one per month, then the whole span
+    min_cash_buffer_cents: int
+    forecast: list[ForecastWeekOut]
+    obligations: ObligationsOut
+    receivables: AgingOut

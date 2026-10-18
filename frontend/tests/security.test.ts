@@ -14,6 +14,8 @@ describe("backend proxy allowlist", () => {
     ["POST", "financing"],
     ["GET", "memo"],
     ["POST", "memo"],
+    ["GET", "paperwork/month-close"],
+    ["GET", "paperwork/bank-pack"],
   ])("allows %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(true));
 
   it.each([
@@ -25,6 +27,8 @@ describe("backend proxy allowlist", () => {
     ["GET", "openapi.json"],
     ["GET", "whatif"], // a simulation is a POST with a JSON body only
     ["POST", "whatif/1"],
+    ["POST", "paperwork/month-close"], // read-only
+    ["GET", "paperwork/other"],
   ])("refuses %s /%s", (method, path) => expect(isAllowed(method, path)).toBe(false));
 });
 

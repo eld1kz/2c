@@ -114,8 +114,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: me } = useMe();
   return (
     <EvidenceProvider>
-      <div className="min-h-dvh md:grid md:grid-cols-[232px_1fr]">
-        <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-3 py-5 md:flex">
+      <div className="min-h-dvh md:grid md:grid-cols-[232px_1fr] print:block">
+        <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-3 py-5 md:flex print:hidden">
           <div className="px-3">
             <Wordmark />
             <p className="mt-4 truncate text-sm font-medium text-ink">{me?.business.name ?? " "}</p>
@@ -141,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden print:hidden">
           <div className="min-w-0">
             <Wordmark />
             <p className="truncate text-xs text-ink-3">{me ? `${me.business.name}, as of ${formatDate(me.as_of)}` : " "}</p>
@@ -154,11 +154,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-w-0 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12">
+        <main className="min-w-0 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 print:p-0">
           <div className="mx-auto max-w-[1120px]">{children}</div>
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden" aria-label="Main">
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden print:hidden" aria-label="Main">
           {NAV.filter((item) => !item.more).map((item) => (
             <NavLink key={item.href} item={item} compact />
           ))}

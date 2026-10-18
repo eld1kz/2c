@@ -39,6 +39,15 @@ but nothing sends it. The only supplier email the app can send is the Phase 6 te
 | A4 | The same action executed twice | The second call returns the original result; no duplicate SandboxPayment | `backend/tests/test_action_service.py::test_a4_executing_twice_returns_original_result`, `backend/tests/test_action_service.py::test_a4_db_rejects_second_sandbox_payment_for_one_action`, `backend/tests/test_action_service.py::test_idempotency_key_returns_the_same_action` |
 | A5 | Tamper with one AuditEvent row | `/audit/verify` reports the broken chain at that seq | `backend/tests/test_audit.py::test_a5_tampered_row_breaks_chain_at_that_seq`, `backend/tests/test_audit.py::test_recomputed_hash_after_tamper_still_breaks_next_link`, `backend/tests/test_api.py::test_audit_list_and_verify_detects_tamper`. A DB owner who rewrites the chain *and* recomputes every hash fools `/audit/verify`, but not the anchor committed with the evidence export: `backend/tests/test_evidence_export.py::test_the_anchor_catches_a_rewritten_chain_that_verify_accepts`, `backend/tests/test_evidence_export.py::test_the_anchor_catches_deleted_newest_events` |
 
+## Paperwork Center (Phase 6b)
+
+| Case | Tests |
+|---|---|
+| September statements reconcile to the ledger to the cent | `backend/tests/test_statements.py::test_every_transaction_lands_in_exactly_one_line`, `backend/tests/test_statements.py::test_cash_flow_reconciles_with_pnl_snapshot_and_bank`, `backend/tests/test_statements.py::test_bank_statement_balance_matches_the_books` |
+| A bank statement that disagrees, or has no running balance, is reported, not hidden | `backend/tests/test_statements.py::test_a_statement_that_disagrees_is_reported`, `backend/tests/test_statements.py::test_a_statement_without_running_balance_cannot_reconcile` |
+| Figures agree across reports (month close, bank pack, forecast, dashboard) | `backend/tests/test_statements.py::test_bank_pack_agrees_with_month_close_and_forecast`, `backend/tests/test_statements.py::test_aging_matches_the_open_invoices`, `backend/tests/test_statements.py::test_obligations_are_the_forecasts_rent_and_lease_lines`, `backend/tests/test_statements.py::test_api_figures_agree_with_the_dashboard` |
+| Pages, label, Not included and the PDF | `frontend/e2e/paperwork.spec.ts::"close my month: September reconciles and every report renders"`, `frontend/e2e/paperwork.spec.ts::"bank-ready pack: all sections, Not included, and a one-file PDF"` |
+
 ## Deployment cases (Phase 7)
 
 | Case | Tests |

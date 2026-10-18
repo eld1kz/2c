@@ -38,7 +38,7 @@ class ParsedRow:
     date: date
     amount: int  # signed cents: inflow > 0
     description: str
-    balance: int | None  # validation only; not stored
+    balance: int | None  # running balance as printed; stored for the bank reconciliation, never used as cash
 
 
 def parse_cents(text: str) -> int:

@@ -123,6 +123,7 @@ def ingest_csv(session: Session, account: Account, filename: str, data: bytes, c
             needs_review=c.needs_review or link.conflict,
             source_file=filename[:255],
             invoice_id=link.invoice.id if link.invoice else None,
+            statement_balance=row.balance,
         )
         for row, cp_id, link, c in zip(fresh, cp_ids, links, results)
     ]

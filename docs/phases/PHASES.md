@@ -82,6 +82,31 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - P4 full flow in UI: gap alert → what-if → ranked financing → proposed action → approve.
   Verified live and repeatable: `LIVE=1 npx playwright test e2e/live-p4.spec.ts --project=desktop` (cash-gap card → what-if → leftover financing: supplier terms $0 first, overdraft second → chat proposes the reminder + terms request → approve both → two sandbox emails → audit verifies → reset).
 
+## Phase 6b — Paperwork Center  *(Oct 18)*
+- **6b-1:** cash-basis statements in `engine/statements.py`:
+  - month close for the month before `DEMO_TODAY`: bank reconciliation against the CSV running balance (`transactions.statement_balance`, migration 0008), P&L, cash-flow statement, AR/AP aging;
+  - bank-ready pack: 3-month P&L and cash flow, 13-week forecast, fixed obligations from recurring rent/lease, AR aging, Not included;
+  - `/paperwork` page, with the PDF from the browser's print and the review label in every page footer.
+- **6b-2 (only after checking with the owner; may be swapped for a "Safe to spend" dashboard hero):**
+  - Claude's cited "What this means for you" per report and a factual credit story (never claims creditworthiness or predicts approval), cached like the memo;
+  - beginner-mode term explanations;
+  - first-run guide on an empty business;
+  - the agent points to the pack when financing is recommended.
+
+**Acceptance (6b-1)**
+- `backend/tests/test_statements.py`: September reconciles to the cent:
+  - every transaction lands in exactly one line;
+  - net profit + transfers = net change in cash;
+  - book closing = statement closing = cash-flow closing = `/position` cash;
+  - aging totals = open outstanding (INV-1042 in 31–60);
+  - the pack's September column = month close;
+  - obligations = the forecast's rent/lease lines (lease $12,000 in week 6).
+- `frontend/e2e/paperwork.spec.ts`:
+  - both tabs render, with the label and Not included;
+  - no side scroll at phone width;
+  - print hides the app chrome, and the footer rule carries the label;
+  - `page.pdf()` produces the pack.
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 - Deploy: one Singapore VPS with Docker Compose (Caddy → Next.js → FastAPI → Postgres) and a custom domain, reachable from mainland China (SPEC §3). README with setup/deploy/tests.
 - Demo safety on the deployed instance (`APP_ENV=production`): automatic demo reset every 3 h (host cron, `seed.reset --scheduled`) plus the owner button, login-page note; `DAILY_LLM_BUDGET_USD=5` and a separate Anthropic key with a $50/month cap; per-IP limits at Caddy; demo accounts exempt from the email lockout; 300 chat turns/day; chat lock and conversations per sign-in session, not per user; boot refuses development defaults.
@@ -97,4 +122,4 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - China reachability: mainland multi-node probes (itdog.cn / boce.com) return 200 from ≥ 90% of China Telecom, Unicom and Mobile nodes with median load < 2 s, daytime and 20:00–23:00 Beijing; DNS resolves to the server.
 - `evidence/` export + `anchor.json` committed; `--check-file` and `--verify-anchor` pass.
 
-**Cut order if behind:** on-chain bonus → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.
+**Cut order if behind:** on-chain bonus → Phase 6b-2 → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.

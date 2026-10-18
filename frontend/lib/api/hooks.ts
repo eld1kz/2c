@@ -68,6 +68,12 @@ export function useGenerateMemo() {
   });
 }
 
+export const useMonthClose = () =>
+  useQuery({ queryKey: ["paperwork", "month-close"], queryFn: async () => unwrap(await api.GET("/paperwork/month-close")) });
+
+export const useBankPack = () =>
+  useQuery({ queryKey: ["paperwork", "bank-pack"], queryFn: async () => unwrap(await api.GET("/paperwork/bank-pack")) });
+
 export const useBudget = () =>
   useQuery({ queryKey: keys.budget, queryFn: async () => unwrap(await api.GET("/llm-budget")), refetchInterval: 60_000 });
 

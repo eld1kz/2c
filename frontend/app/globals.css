@@ -102,3 +102,22 @@ body {
   padding: 0.35em 0.75em 0.35em 0;
   text-align: left;
 }
+
+/* Printing (the bank-ready pack's "Download PDF"): no app chrome, white paper, and the review label
+   in the footer of every sheet. Keep it in sync with DISCLAIMER in backend/app/engine/statements.py. */
+@media print {
+  body {
+    background: white;
+  }
+  [data-sonner-toaster] {
+    display: none;
+  }
+}
+@page {
+  margin: 14mm 12mm 18mm;
+  @bottom-center {
+    content: "Prepared from your records for review; not audited; not tax or legal advice.";
+    font-size: 8pt;
+    color: #5b6472;
+  }
+}

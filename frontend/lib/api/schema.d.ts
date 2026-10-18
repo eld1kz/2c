@@ -380,6 +380,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/paperwork/month-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Month Close */
+        get: operations["month_close_paperwork_month_close_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/paperwork/bank-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bank Pack */
+        get: operations["bank_pack_paperwork_bank_pack_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -401,6 +435,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountReconciliationOut */
+        AccountReconciliationOut: {
+            account: components["schemas"]["EvidenceRef"];
+            /** Book Opening Cents */
+            book_opening_cents: number;
+            /** Money In Cents */
+            money_in_cents: number;
+            /** Money Out Cents */
+            money_out_cents: number;
+            /** Book Closing Cents */
+            book_closing_cents: number;
+            /** Statement Closing Cents */
+            statement_closing_cents: number | null;
+            /** Statement Date */
+            statement_date: string | null;
+            /** Difference Cents */
+            difference_cents: number | null;
+            /** To Review */
+            to_review: components["schemas"]["EvidenceRef"][];
+        };
         /**
          * ActionDisplayOut
          * @description Server-built summary for an approval card (see services/action_display.py).
@@ -501,6 +555,42 @@ export interface components {
              */
             start: string;
         };
+        /** AgingOut */
+        AgingOut: {
+            /** Direction */
+            direction: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Rows */
+            rows: components["schemas"]["AgingRowOut"][];
+            /** Totals Cents */
+            totals_cents: {
+                [key: string]: number;
+            };
+            /** Total Cents */
+            total_cents: number;
+        };
+        /** AgingRowOut */
+        AgingRowOut: {
+            invoice: components["schemas"]["EvidenceRef"];
+            /** Number */
+            number: string;
+            counterparty: components["schemas"]["EvidenceRef"];
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /** Days Past Due */
+            days_past_due: number;
+            /** Outstanding Cents */
+            outstanding_cents: number;
+            /** Bucket */
+            bucket: string;
+        };
         /**
          * AssumptionOut
          * @description One scenario input, shown as an assumption, never as a recorded fact. `amount_source` says whether the
@@ -560,6 +650,34 @@ export interface components {
             /** Hash */
             hash: string;
         };
+        /** BankPackOut */
+        BankPackOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Business Name */
+            business_name: string;
+            /** Basis */
+            basis: string;
+            /** Disclaimer */
+            disclaimer: string;
+            /** Months */
+            months: components["schemas"]["PeriodOut"][];
+            /** Profit And Loss */
+            profit_and_loss: components["schemas"]["ProfitAndLossOut"][];
+            /** Cash Flow */
+            cash_flow: components["schemas"]["CashFlowOut"][];
+            /** Min Cash Buffer Cents */
+            min_cash_buffer_cents: number;
+            /** Forecast */
+            forecast: components["schemas"]["ForecastWeekOut"][];
+            obligations: components["schemas"]["ObligationsOut"];
+            receivables: components["schemas"]["AgingOut"];
+        };
         /** Body_upload_upload_post */
         Body_upload_upload_post: {
             /** File */
@@ -570,6 +688,24 @@ export interface components {
          * @enum {string}
          */
         Cadence: "weekly" | "monthly" | "quarterly";
+        /** CashFlowOut */
+        CashFlowOut: {
+            period: components["schemas"]["PeriodOut"];
+            /** Opening Cents */
+            opening_cents: number;
+            /** Operating In Cents */
+            operating_in_cents: number;
+            /** Operating Out Cents */
+            operating_out_cents: number;
+            /** Net Operating Cents */
+            net_operating_cents: number;
+            /** Transfers Cents */
+            transfers_cents: number;
+            /** Net Change Cents */
+            net_change_cents: number;
+            /** Closing Cents */
+            closing_cents: number;
+        };
         /**
          * Category
          * @enum {string}
@@ -919,6 +1055,49 @@ export interface components {
             /** Stale */
             stale: boolean;
         };
+        /** MonthCloseOut */
+        MonthCloseOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Basis */
+            basis: string;
+            /** Disclaimer */
+            disclaimer: string;
+            period: components["schemas"]["PeriodOut"];
+            reconciliation: components["schemas"]["ReconciliationOut"];
+            profit_and_loss: components["schemas"]["ProfitAndLossOut"];
+            cash_flow: components["schemas"]["CashFlowOut"];
+            receivables: components["schemas"]["AgingOut"];
+            payables: components["schemas"]["AgingOut"];
+        };
+        /** ObligationOut */
+        ObligationOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Week */
+            week: number;
+            series: components["schemas"]["EvidenceRef"];
+            counterparty: components["schemas"]["EvidenceRef"];
+            /** Category */
+            category: string;
+            /** Amount Cents */
+            amount_cents: number;
+        };
+        /** ObligationsOut */
+        ObligationsOut: {
+            /** Rows */
+            rows: components["schemas"]["ObligationOut"][];
+            /** Total Cents */
+            total_cents: number;
+        };
         /** OneOffIn */
         OneOffIn: {
             /**
@@ -937,6 +1116,30 @@ export interface components {
              */
             on: string;
         };
+        /** PeriodOut */
+        PeriodOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Label */
+            label: string;
+        };
+        /** PnlLineOut */
+        PnlLineOut: {
+            /** Key */
+            key: string;
+            /** Amount Cents */
+            amount_cents: number;
+            /** Count */
+            count: number;
+        };
         /** PositionOut */
         PositionOut: {
             /**
@@ -954,6 +1157,46 @@ export interface components {
             headroom_cents: number;
             /** Evidence */
             evidence: components["schemas"]["EvidenceRef"][];
+        };
+        /** ProfitAndLossOut */
+        ProfitAndLossOut: {
+            period: components["schemas"]["PeriodOut"];
+            /** Revenue */
+            revenue: components["schemas"]["PnlLineOut"][];
+            /** Cogs */
+            cogs: components["schemas"]["PnlLineOut"][];
+            /** Operating Expenses */
+            operating_expenses: components["schemas"]["PnlLineOut"][];
+            /** Other Income */
+            other_income: components["schemas"]["PnlLineOut"][];
+            /** Total Revenue Cents */
+            total_revenue_cents: number;
+            /** Total Cogs Cents */
+            total_cogs_cents: number;
+            /** Gross Profit Cents */
+            gross_profit_cents: number;
+            /** Total Operating Expenses Cents */
+            total_operating_expenses_cents: number;
+            /** Total Other Income Cents */
+            total_other_income_cents: number;
+            /** Net Profit Cents */
+            net_profit_cents: number;
+            /** Transfers Cents */
+            transfers_cents: number;
+            /** Transaction Count */
+            transaction_count: number;
+        };
+        /** ReconciliationOut */
+        ReconciliationOut: {
+            period: components["schemas"]["PeriodOut"];
+            /** Accounts */
+            accounts: components["schemas"]["AccountReconciliationOut"][];
+            /** Book Opening Cents */
+            book_opening_cents: number;
+            /** Book Closing Cents */
+            book_closing_cents: number;
+            /** Reconciled */
+            reconciled: boolean;
         };
         /**
          * RecordOut
@@ -1842,6 +2085,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemoOut"];
+                };
+            };
+        };
+    };
+    month_close_paperwork_month_close_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthCloseOut"];
+                };
+            };
+        };
+    };
+    bank_pack_paperwork_bank_pack_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankPackOut"];
                 };
             };
         };

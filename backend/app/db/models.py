@@ -259,6 +259,8 @@ class Transaction(Base):
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
     source_file: Mapped[str] = mapped_column(String(255))
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id"))
+    # Running balance printed on the bank CSV row: untrusted, only compared in the bank reconciliation.
+    statement_balance: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class CategoryRule(Base):
