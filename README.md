@@ -20,7 +20,7 @@ Nothing is paid or sent until a person approves it, and every step lands in a ha
 
 Docs: [architecture](docs/architecture.md) · [security self-assessment](docs/security-assessment.md) ·
 [threat model](docs/threat-model.md) · [test cases](docs/test-cases.md) · [spec](SPEC.md) ·
-[build phases](docs/phases/PHASES.md)
+[build phases](docs/phases/PHASES.md) · [demo video](demo/README.md)
 
 ## Demo
 
@@ -39,7 +39,20 @@ state, the owner presses "Reset demo data" in the app, or run `cd backend && pyt
 the audit log is never reset. The assistant has a daily AI budget (`DAILY_LLM_BUDGET_USD`, default
 $2), so it can answer "budget used up" after heavy use.
 
-**A 5-minute tour** (the golden scenarios, SPEC §9):
+### Demo video
+
+A 2-minute walkthrough of every screen (sign-in, Today with an approval and its impact preview,
+Overview, Insights, What-if and financing, Ask the CFO, Approvals, CFO memo, Paperwork, Team,
+Transactions, Import with the Plaid sandbox sync, Audit log, Trust) is recorded from a script, so it
+can be re-recorded after any UI change: `demo/record.sh` → `demo/out/ledgerwise-demo.mp4`
+(git-ignored). How to install the recorder and edit the scenes: [demo/README.md](demo/README.md).
+
+> **Needs input from the team:** link to the published demo video (YouTube, Bilibili or a drive
+> link reviewers in mainland China can open). Until then, record it locally with `demo/record.sh`.
+
+### A 5-minute tour
+
+The golden scenarios (SPEC §9):
 
 1. **P1, late payer:** Insights → "Harbor Lane Café owes $4,800, 45 days overdue" → Ask the CFO →
    it drafts a reminder → Approvals → Approve → the sandbox email appears → Audit → Verify chain.
@@ -70,11 +83,13 @@ $2), so it can answer "budget used up" after heavy use.
 ```
 backend/    FastAPI app: ingestion, engine, agent, policy gate, action service, sandbox, audit (pytest)
 frontend/   Next.js App Router UI + same-origin gateway (Vitest, Playwright)
+demo/       demo video storyboard (shot-scraper) + record.sh; output in demo/out/ (git-ignored)
 deploy/     production Docker Compose, Caddyfile, cron, env template, server bootstrap (ready, not deployed)
 docs/       architecture, security assessment, threat model, test cases, phases
 evidence/   execution evidence export (JSONL) + audit anchor, from the local stack
 scripts/    ship.sh (the only way to commit), deploy.sh, check_deploy.sh, fetch_evidence.sh
 backend/scripts/plaid_check.py   one-command live check of the Plaid sandbox feed (dry run)
+.mcp.json   Playwright MCP for Claude Code (browser automation + video tools, development only)
 ```
 
 ## Run it locally
@@ -85,7 +100,7 @@ which answers "not configured".
 
 ```bash
 # 0. Get the code
-git clone <this repository> ledgerwise && cd ledgerwise
+git clone https://github.com/eld1kz/2c.git ledgerwise && cd ledgerwise
 
 # 1. Database: Postgres 16 in Docker Compose, on 127.0.0.1:5432 (user/password/db: ledgerwise)
 docker compose up -d db
@@ -310,7 +325,7 @@ the server.
 
 ## How this was built (AI-assisted development)
 
-Ledgerwise was built with Claude Code as a pair programmer, in seven phases (`docs/phases/PHASES.md`).
+Ledgerwise was built with Claude Code as a pair programmer, in phases 0–9 (`docs/phases/PHASES.md`).
 Each phase started with a written plan that a human reviewed and approved before any code was
 written. A phase was done only when its acceptance tests passed, and every commit went through
 `scripts/ship.sh`, which runs the whole test suite and the safety checks. The hard rules in
@@ -323,6 +338,9 @@ owns the design decisions, the scope, and what was cut.
 
 Copyright (c) 2026 Eldar Ugay and team. All rights reserved. Source provided for competition review.
 See [LICENSE](LICENSE).
+
+> **Needs input from the team:** the full list of team members (names as registered for the
+> competition), for this line and `LICENSE`.
 
 Third-party dependencies keep their own licenses. As checked on Oct 18, 2026, they are mostly MIT,
 BSD, Apache-2.0 and ISC, with no GPL or AGPL. The exceptions: `psycopg` and the `libvips` binaries

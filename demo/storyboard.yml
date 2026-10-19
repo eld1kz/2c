@@ -1,0 +1,160 @@
+# Ledgerwise mini demo: one pass through every screen as the owner.
+# Record with: demo/record.sh  (needs the local stack: db, backend :8000, frontend :3000)
+# Selectors are Playwright locator strings. Navigation goes through the sidebar (client-side),
+# so the style injected at the start, which hides the Next.js dev badge, stays for the whole video.
+output: demo/out/ledgerwise-demo.webm
+url: http://localhost:3000/login
+viewport:
+  width: 1280
+  height: 720
+cursor: true
+wait_for: 'role=button[name=/Sign in as owner/]'
+
+scenes:
+  - name: "Sign in (owner)"
+    do:
+      - pause: 1.5
+      - click: 'role=button[name=/Sign in as owner/]'
+      - wait_for_url: '**/today'
+      - wait_for: '#decisions-title'
+      - js: |
+          const s = document.createElement('style');
+          s.textContent = 'nextjs-portal { display: none !important; }';
+          document.head.appendChild(s);
+
+  - name: "Today: forecast, decisions, can I afford it"
+    do:
+      - pause: 2.5
+      - scroll: { to: '#decisions-title', duration: 1.2 }
+      - pause: 3
+      - click: 'role=button[name="Review reminder"]'
+      - wait_for: 'role=dialog >> role=button[name="Approve and send"]'
+      - pause: 4
+      - scroll: { to: 'role=dialog >> role=button[name="Approve and send"]', duration: 1.2 }
+      - pause: 1.5
+      - click: 'role=dialog >> role=button[name="Approve and send"]'
+      - wait_for: 'role=dialog >> [data-testid="sandbox-result"]'
+      - pause: 3.5
+      - press: Escape
+      - pause: 1
+      - scroll: { to: '#afford-title', duration: 1 }
+      - click: 'role=button[name="Hire a barista at $2,500/month from November?"]'
+      - pause: 4
+      - scroll: { y: 600, duration: 1.2 }
+      - pause: 2.5
+
+  - name: "Overview: 13-week forecast with traceable lines"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Overview"]'
+      - wait_for: 'role=button[name="Table"]'
+      - pause: 2.5
+      - click: 'role=button[name="Table"]'
+      - pause: 1
+      - click: 'role=button[name=/^W6/]'
+      - wait_for: 'role=dialog'
+      - pause: 3.5
+      - press: Escape
+      - pause: 1
+
+  - name: "Insights with dollar impact and evidence"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Insights"]'
+      - wait_for_url: '**/insights'
+      - pause: 2.5
+      - scroll: { y: 500, duration: 1.5 }
+      - pause: 2
+
+  - name: "What-if simulator and financing ranking"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="What-if"]'
+      - wait_for: 'role=link[name=/^What if Harbor Lane/]'
+      - pause: 1.5
+      - click: 'role=link[name=/^What if Harbor Lane/]'
+      - wait_for: '[data-testid="whatif-summary"]'
+      - pause: 3.5
+      - click: 'role=button[name=/^Compare financing/]'
+      - pause: 2
+      - scroll: { y: 500, duration: 1.2 }
+      - pause: 3
+
+  - name: "Ask the CFO (live agent, cited answer)"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Ask"]'
+      - wait_for: 'role=button[name="Why will I be short on cash?"]'
+      - pause: 1.5
+      - click: 'role=button[name="Why will I be short on cash?"]'
+      - wait_for: '[data-testid="answer"]'
+      - pause: 2
+      - scroll: { to: '[data-testid="answer"]', duration: 1.2 }
+      - pause: 4
+
+  - name: "Approvals inbox: decided actions with sandbox results"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name=/^Approvals/]'
+      - wait_for: 'role=tab[name=/Waiting/]'
+      - pause: 2
+      - click: 'role=tab[name="Decided"]'
+      - pause: 3.5
+
+  - name: "Weekly CFO memo"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="CFO memo"]'
+      - wait_for_url: '**/memo'
+      - pause: 2.5
+      - scroll: { y: 500, duration: 1.2 }
+      - pause: 2
+
+  - name: "Paperwork Center and bank-ready pack"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Paperwork"]'
+      - wait_for: 'role=link[name="Get bank-ready"]'
+      - pause: 2.5
+      - click: 'role=link[name="Get bank-ready"]'
+      - wait_for: '[data-testid="bank-pack"]'
+      - pause: 2.5
+      - scroll: { y: 700, duration: 2 }
+      - pause: 2
+
+  - name: "Team"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Team"]'
+      - wait_for_url: '**/team'
+      - pause: 3
+
+  - name: "Transactions and categorization"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Transactions"]'
+      - wait_for_url: '**/transactions'
+      - pause: 2.5
+      - scroll: { y: 500, duration: 1.2 }
+      - pause: 1.5
+
+  - name: "Import: CSV upload and Plaid sandbox bank feed"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Import"]'
+      - wait_for: 'role=button[name="Sync bank feed"]'
+      - pause: 2.5
+      - click: 'role=button[name="Sync bank feed"]'
+      - wait_for: 'text=/Imported \d+ of \d+ rows/'
+      - pause: 1
+      - scroll: { to: 'text=/Imported \d+ of \d+ rows/', duration: 1.2 }
+      - pause: 4
+
+  - name: "Hash-chained audit log"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Audit log"]'
+      - wait_for: 'role=button[name="Verify chain"]'
+      - pause: 1.5
+      - click: 'role=button[name="Verify chain"]'
+      - wait_for: 'text=Chain intact'
+      - pause: 3
+
+  - name: "Trust and guardrails"
+    do:
+      - click: 'nav[aria-label="Main"] >> visible=true >> role=link[name="Trust"]'
+      - wait_for: 'role=heading[name="Trust & guardrails"]'
+      - pause: 2.5
+      - scroll: { y: 600, duration: 1.5 }
+      - pause: 2
+      - scroll: { y: 600, duration: 1.5 }
+      - pause: 2.5
