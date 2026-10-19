@@ -15,6 +15,7 @@ export const keys = {
   budget: ["llm-budget"],
   pending: ["actions", "proposed"],
   today: ["today"],
+  trust: ["trust"],
 } as const;
 
 export const useMe = () =>
@@ -130,6 +131,9 @@ export const useActions = () =>
   useQuery({ queryKey: ["actions", "all"], queryFn: async () => unwrap(await api.GET("/actions")) });
 
 /** Approve or reject. On success every view that depends on actions or cash is refreshed. */
+export const useTrust = () =>
+  useQuery({ queryKey: keys.trust, queryFn: async () => unwrap(await api.GET("/trust")) });
+
 export function useDecide() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -138,7 +142,7 @@ export function useDecide() {
         ? unwrap(await api.POST("/actions/{action_id}/approve", { params: { path: { action_id: id } } }))
         : unwrap(await api.POST("/actions/{action_id}/reject", { params: { path: { action_id: id } } })),
     onSettled: () => {
-      for (const key of [["actions"], keys.position, keys.forecast, keys.insights, keys.today]) {
+      for (const key of [["actions"], keys.position, keys.forecast, keys.insights, keys.today, keys.trust]) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
     },

@@ -482,6 +482,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bank-feed/plaid/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plaid Sync */
+        post: operations["plaid_sync_bank_feed_plaid_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trust */
+        get: operations["get_trust_trust_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -548,6 +582,37 @@ export interface components {
             denied_reason: string | null;
             /** Evidence */
             evidence: components["schemas"]["EvidenceRef"][];
+            impact?: components["schemas"]["ActionImpactOut"] | null;
+        };
+        /**
+         * ActionImpactOut
+         * @description Engine what-if of approving a proposed action (services/action_impact.py); cents.
+         */
+        ActionImpactOut: {
+            /** Lowest Before */
+            lowest_before: number;
+            /**
+             * Lowest Before Week
+             * Format: date
+             */
+            lowest_before_week: string;
+            /** Lowest After */
+            lowest_after: number;
+            /**
+             * Lowest After Week
+             * Format: date
+             */
+            lowest_after_week: string;
+            /** Weeks Below Before */
+            weeks_below_before: number;
+            /** Weeks Below After */
+            weeks_below_after: number;
+            /** First Below After */
+            first_below_after: string | null;
+            /** Closing Delta */
+            closing_delta: number;
+            /** Min Cash Buffer */
+            min_cash_buffer: number;
         };
         /** ActionIn */
         ActionIn: {
@@ -1600,6 +1665,70 @@ export interface components {
             /** Has More */
             has_more: boolean;
         };
+        /** TrustBoundaryOut */
+        TrustBoundaryOut: {
+            /** Tool */
+            tool: string;
+            /** Tier */
+            tier: string;
+            /** Agent Effect */
+            agent_effect: string;
+            /** Propose */
+            propose: string[];
+            /** Approve */
+            approve: string[];
+        };
+        /** TrustDenialOut */
+        TrustDenialOut: {
+            /** Seq */
+            seq: number;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Tool */
+            tool: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /** TrustLimitsOut */
+        TrustLimitsOut: {
+            /** Max Single Payment */
+            max_single_payment: number;
+            /** Max Daily Payments */
+            max_daily_payments: number;
+            /** Currency */
+            currency: string;
+            /** Reminder Cooldown Days */
+            reminder_cooldown_days: number;
+            /** Require Owner For */
+            require_owner_for: string[];
+            /** Daily Ai Budget Cents */
+            daily_ai_budget_cents: number;
+            /** Max Model Calls Per Turn */
+            max_model_calls_per_turn: number;
+            /** Max Proposals Per Turn */
+            max_proposals_per_turn: number;
+        };
+        /**
+         * TrustOut
+         * @description GET /trust (services/trust.py): boundaries, limits, guardrail activity and chain status.
+         */
+        TrustOut: {
+            /** Boundaries */
+            boundaries: components["schemas"]["TrustBoundaryOut"][];
+            /** Agent Can Approve */
+            agent_can_approve: boolean;
+            limits: components["schemas"]["TrustLimitsOut"];
+            /** Activity */
+            activity: {
+                [key: string]: number;
+            };
+            /** Recent Denials */
+            recent_denials: components["schemas"]["TrustDenialOut"][];
+            chain: components["schemas"]["VerifyOut"];
+        };
         /** UntrustedOut */
         UntrustedOut: {
             /** Untrusted Text */
@@ -2525,6 +2654,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+        };
+    };
+    plaid_sync_bank_feed_plaid_sync_post: {
+        parameters: {
+            query?: {
+                account_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trust_trust_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustOut"];
                 };
             };
         };

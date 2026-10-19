@@ -188,3 +188,13 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 
 **Acceptance**
 - `backend/tests/test_plaid_feed.py` passes; `python -m scripts.plaid_check` prints PASS against the live sandbox; "Sync bank feed" shows "Imported 5 of 9 rows"; `scripts/ship.sh` green. *Done Oct 19.*
+
+## Phase 9 — Trust page + approval impact preview  *(Oct 20)*
+- No Anthropic API calls (the remaining API budget is kept for the demo).
+- **Approval impact preview:** `engine/impact.py` summarizes a what-if (lowest week before/after, weeks below the cushion, week-13 change); `services/action_impact.py` maps a proposed `send_reminder` → `CollectReceivable(today)` and `send_terms_request` → `DelaySupplierPayments(+30)`, the same scenarios as Today's fixes; `ActionDisplayOut.impact`; "If you approve" block on the approval card.
+- **Trust & guardrails:** `GET /trust` (`services/trust.py`, `routes_trust.py`), every role, read-only: boundaries from `TOOL_TIERS` + `can_propose`/`can_approve`, Policy and agent limits, audit counts for this business, last 5 gate denials, `verify_chain`. `/trust` page under More; gateway allowlist `GET trust`.
+
+**Acceptance**
+- `backend/tests/test_action_impact.py`: INV-1042 reminder lifts week 13 by $4,800 and matches Today's fix scenario; Verde terms request reduces weeks below the cushion; price request and decided actions have no preview; `GET /actions` writes nothing and calls no model.
+- `backend/tests/test_trust.py`: every tool listed, no approve capability, A2 denial counted and shown, viewer refusal counted, other businesses not counted, A5 tamper reported, every role 200 with the Policy limits and no model call.
+- `frontend/e2e/trust.spec.ts`: owner and viewer see limits, tool table and an intact chain, no side scroll.

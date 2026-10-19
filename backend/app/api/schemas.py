@@ -61,6 +61,20 @@ class SandboxResultOut(BaseModel):
     at: datetime | None
 
 
+class ActionImpactOut(BaseModel):
+    """Engine what-if of approving a proposed action (services/action_impact.py); cents."""
+
+    lowest_before: int
+    lowest_before_week: date
+    lowest_after: int
+    lowest_after_week: date
+    weeks_below_before: int
+    weeks_below_after: int
+    first_below_after: date | None
+    closing_delta: int
+    min_cash_buffer: int
+
+
 class ActionDisplayOut(BaseModel):
     """Server-built summary for an approval card (see services/action_display.py)."""
 
@@ -76,6 +90,7 @@ class ActionDisplayOut(BaseModel):
     sandbox: SandboxResultOut | None
     denied_reason: str | None
     evidence: "list[EvidenceRef]"
+    impact: ActionImpactOut | None = None
 
 
 class ActionOut(BaseModel):
@@ -655,3 +670,40 @@ class AffordOut(BaseModel):
     requested_start: date | None = None
     short_from: date | None = None  # first week already below the cushion without the plan
     with_fixes: AffordFixesOut | None = None  # the same plan if Today's fixes succeed (engine verdict)
+
+
+class TrustBoundaryOut(BaseModel):
+    tool: str
+    tier: str
+    agent_effect: str
+    propose: list[str]  # roles that may propose (or run) it
+    approve: list[str]  # roles that may approve it (EXECUTE only)
+
+
+class TrustLimitsOut(BaseModel):
+    max_single_payment: int  # cents
+    max_daily_payments: int  # cents
+    currency: str
+    reminder_cooldown_days: int
+    require_owner_for: list[str]
+    daily_ai_budget_cents: int
+    max_model_calls_per_turn: int
+    max_proposals_per_turn: int
+
+
+class TrustDenialOut(BaseModel):
+    seq: int
+    ts: datetime
+    tool: str | None
+    reason: str
+
+
+class TrustOut(BaseModel):
+    """GET /trust (services/trust.py): boundaries, limits, guardrail activity and chain status."""
+
+    boundaries: list[TrustBoundaryOut]
+    agent_can_approve: bool
+    limits: TrustLimitsOut
+    activity: dict[str, int]
+    recent_denials: list[TrustDenialOut]
+    chain: VerifyOut
