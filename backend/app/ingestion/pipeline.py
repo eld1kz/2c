@@ -1,4 +1,4 @@
-"""CSV → Transactions: parse, normalize, link invoices, match counterparties, categorize, insert.
+"""CSV or bank feed → Transactions: parse, normalize, link invoices, match counterparties, categorize, insert.
 
 Writes only the `transactions` table. Never creates counterparties from description text:
 counterparties feed the payment gate, so untrusted text must not mint them (T1).
@@ -60,7 +60,12 @@ def _link(row: ParsedRow, currency: str, matched_cp: int | None, invoices: dict[
 
 
 def ingest_csv(session: Session, account: Account, filename: str, data: bytes, classifier: Classifier) -> IngestResult:
-    parsed = parse_csv(filename, data)
+    return ingest_rows(session, account, filename, parse_csv(filename, data), classifier)
+
+
+def ingest_rows(session: Session, account: Account, filename: str, parsed: list[ParsedRow],
+                classifier: Classifier) -> IngestResult:
+    """Rows from any source (CSV, Plaid sandbox feed); `filename` is stored as the transaction's source_file."""
     business_id = account.business_id
 
     counterparties = {
