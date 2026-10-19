@@ -37,6 +37,8 @@ The agent has **no approve capability**. Approvals exist only as authenticated H
 | Propose / approve payment reminders | — | ✓ | ✓ |
 | Propose / approve payments, loan applications, supplier terms requests | — | — | ✓ |
 | Reset the demo data | — | — | ✓ |
+| Trust page (`GET /trust`): boundaries, limits, guardrail activity, chain status | ✓ | ✓ | ✓ |
+| See the "If you approve" 13-week impact on an approval card | ✓ | ✓ | ✓ |
 
 Every refused attempt (wrong role, other business, bad input) returns 403/404/422 and is written to
 the audit log.
@@ -74,6 +76,7 @@ the audit log.
 | T12 | Stolen or forged session | bcrypt; pinned HS256 with a ≥ 32-char secret; 8 h tokens; login lockout (not for the public demo accounts in production) plus per-IP edge limits | `test_api.py`, `test_security_review.py`, `test_production.py` | Mitigated (demo-grade) |
 | T13 | XSS, CSRF, UI injection | httpOnly + SameSite=Strict + Secure cookie; same-origin gateway with route allowlist and Origin check; no raw HTML or links in answers; drafts dropped on `reset` | `frontend/tests/security.test.ts`, `chat-reducer.test.ts`, `e2e/chat.spec.ts` | Mitigated |
 | T14 | Exposed or misconfigured deployment | Only Caddy publishes 80/443; backend and DB on the internal network only; TLS + HSTS + `frame-ancestors 'none'`; API docs off; boot refuses default DB password, empty API key and non-HTTPS CORS; firewall; automatic security updates | `test_production.py`, `scripts/check_deploy.sh` | Mitigated |
+| T17 | Over-sharing on the Trust page; an impact preview read as a promise | Read-only, no model; only this business's audit events; denial reasons truncated, no contact data; boundaries computed from the gate's own tables; preview is the engine what-if (same scenarios as Today), labelled "assuming it succeeds", writes nothing | `test_trust.py`, `test_action_impact.py`, `e2e/trust.spec.ts` | Mitigated |
 
 ## Known residual risks
 
