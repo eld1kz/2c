@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ledgerwise frontend
 
-## Getting Started
-
-First, run the development server:
+Next.js (App Router, TypeScript), Tailwind, shadcn/ui and Recharts. Setup, configuration and the
+full test commands are in the [root README](../README.md#run-it-locally).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+printf 'BACKEND_URL=http://127.0.0.1:8000\nDEMO_PASSWORD=emberoak-demo\n' > .env.local
+npm install
+npm run dev            # http://localhost:3000, needs the backend on :8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Layout
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+app/(app)/       signed-in screens: today, chat (Ask), approvals, dashboard (Overview), insights,
+                 what-if, memo, paperwork, team, transactions, upload (Import), audit, trust
+app/login/       sign-in, with one-click demo accounts when DEMO_PASSWORD is set
+app/api/auth/    login/logout route handlers: set and clear the httpOnly session cookie
+app/api/backend/ same-origin gateway: attaches the token server-side, allows only the method + path
+                 pairs in lib/backend-routes.ts, refuses cross-origin writes
+components/      one folder per screen, plus shell/ (navigation) and ui/ (shadcn)
+lib/             API client (lib/api, generated types: npm run gen:api), money, labels, chat stream
+tests/           Vitest unit tests (gateway allowlist, chat reducer, glossary, ...)
+e2e/             Playwright browser tests against the running stack (phone + desktop)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server on :3000 |
+| `npx tsc --noEmit && npm run lint && npm test` | Types, lint, unit tests (run `npx next typegen` once first) |
+| `npx playwright test` | Browser tests; needs the stack running in the golden state (`python -m seed.reset`) |
+| `npm run gen:api` | Regenerate `lib/api/schema.d.ts` from the backend's OpenAPI |
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`AGENTS.md` is written by `next dev` for coding agents; leave it as is.

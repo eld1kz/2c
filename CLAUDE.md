@@ -38,6 +38,7 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 - Reset demo data to the golden state (keeps the audit log): `cd backend && python -m seed.reset`
 - Frontend: `cd frontend && npm run dev`
 - Local DB: `docker compose up -d db`
+- Demo video: `demo/record.sh` (stack running; resets data before and after; see `demo/README.md`)
 
 ## Env (backend/.env, never commit)
 `DATABASE_URL, ANTHROPIC_API_KEY, LLM_MODEL, JWT_SECRET, DEMO_TODAY=2026-10-01, CORS_ORIGINS`
