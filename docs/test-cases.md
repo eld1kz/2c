@@ -68,6 +68,14 @@ but nothing sends it. The only supplier email the app can send is the Phase 6 te
 | A raise is computed by the engine; the owner's amount is never evidence | `backend/tests/test_afford.py::test_a_raise_is_computed_by_the_engine`, `backend/tests/test_afford.py::test_the_tool_never_counts_the_supplied_amount_as_evidence` |
 | The badge keeps the engine verdict; viewers and the budget are refused before the model | `backend/tests/test_afford.py::test_the_badge_keeps_the_engine_verdict_when_the_text_disagrees`, `backend/tests/test_afford.py::test_viewer_cannot_ask_and_the_model_is_not_called`, `backend/tests/test_afford.py::test_afford_respects_the_daily_ai_budget`, `frontend/e2e/today.spec.ts::"can I afford it: a chip asks, both engine verdicts (today, with Today's fixes), a cited sentence and the chart"` |
 
+## Trust page and approval impact preview (Phase 9, no model calls)
+
+| Case | Tests |
+|---|---|
+| A proposed reminder or terms request shows the engine's 13-week effect; other and decided actions show none; reading it writes nothing | `backend/tests/test_action_impact.py::test_reminder_impact_lifts_every_week_by_the_invoice`, `backend/tests/test_action_impact.py::test_reminder_impact_matches_todays_chart_after_sending`, `backend/tests/test_action_impact.py::test_terms_request_impact_shrinks_the_gap`, `backend/tests/test_action_impact.py::test_price_request_has_no_modelled_impact`, `backend/tests/test_action_impact.py::test_decided_actions_have_no_preview`, `backend/tests/test_action_impact.py::test_actions_api_carries_the_impact_and_writes_nothing` |
+| Trust page: every tool and who may use it, no approve capability for the agent, the Policy limits, every role, no model call | `backend/tests/test_trust.py::test_every_tool_is_listed_with_its_tier_and_the_agent_never_approves`, `backend/tests/test_trust.py::test_every_role_reads_it_with_the_policy_limits_and_no_model_call`, `backend/tests/test_trust.py::test_unauthenticated_is_refused`, `frontend/e2e/trust.spec.ts` (owner and viewer) |
+| Trust page counts guardrails at work (A2 denial, A3 refusal), only for this business, and reports A5 tampering | `backend/tests/test_trust.py::test_a2_denial_is_counted_and_shown`, `backend/tests/test_trust.py::test_viewer_refusal_is_counted`, `backend/tests/test_trust.py::test_other_businesses_events_are_not_counted`, `backend/tests/test_trust.py::test_chain_status_reports_tampering` |
+
 ## Paperwork Center (Phase 6b)
 
 | Case | Tests |
