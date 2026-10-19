@@ -172,3 +172,15 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - `evidence/` export + `anchor.json` committed; `--check-file` and `--verify-anchor` pass. *Done: export from the local stack, 1,690 audit events.*
 
 **Cut order if behind:** on-chain bonus → Phase 6b-2 → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.
+
+---
+
+## Phase 8 — Bank feed: Plaid sandbox  *(Oct 19)*
+- Data in from a bank API, not only CSV: Plaid **sandbox** (SPEC §2 amended: sandbox only, host hard-coded). Chosen over TrueLayer: server-side calls, instant keys, no browser OAuth.
+- `app/ingestion/plaid_feed.py` (client + mapping to `ParsedRow`), `pipeline.ingest_rows` shared with CSV, `POST /bank-feed/plaid/sync`, Import page "Sync bank feed", gateway allowlist.
+- Fictional feed in `seed/golden/plaid_feed.json` (Plaid custom user): 5 new rows, 4 replays of the golden CSV, adversarial row A6.
+- `python -m scripts.plaid_check`: one-command live dry run.
+- Windows support: portable tests (POSIX paths, UTF-8 reads, loopback socketpair allowed); `scripts/ship.sh` runs from Git Bash and pushes the current branch.
+
+**Acceptance**
+- `backend/tests/test_plaid_feed.py` passes; `python -m scripts.plaid_check` prints PASS against the live sandbox; "Sync bank feed" shows "Imported 5 of 9 rows"; `scripts/ship.sh` green. *Done Oct 19.*

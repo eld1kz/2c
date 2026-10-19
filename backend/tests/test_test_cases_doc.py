@@ -22,5 +22,5 @@ def test_every_referenced_test_exists() -> None:
 
 def test_every_case_is_covered() -> None:
     text = DOC.read_text(encoding="utf-8")
-    for case in ("P1", "P2", "P3", "P4", "A1", "A2", "A3", "A4", "A5"):
+    for case in ("P1", "P2", "P3", "P4", "A1", "A2", "A3", "A4", "A5", "A6"):
         assert re.search(rf"^\| {case} \|", text, re.MULTILINE), case

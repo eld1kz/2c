@@ -66,7 +66,7 @@ flowchart LR
 
 | Path | What it holds |
 |---|---|
-| `backend/app/ingestion/` | CSV parser (column variants, debit/credit split, integer cents), description normalizer, counterparty matching |
+| `backend/app/ingestion/` | CSV parser (column variants, debit/credit split, integer cents), Plaid sandbox feed (`plaid_feed.py`), description normalizer, counterparty matching |
 | `backend/app/engine/` | Deterministic engine: categorization, recurring detection, counterparty stats, forecast, what-if, insights, financing, memo facts |
 | `backend/app/agent/` | Tool-use loop, tool schemas and dispatch, system prompt, PII masking, citation checks |
 | `backend/app/policy/` | Tool → tier table, closed EXECUTE parameter schemas, the gate, numeric limits |
@@ -106,6 +106,16 @@ description text, because counterparties feed the payment gate. Categorization i
 rows no rule covers go to the LLM classifier, which sees normalized text inside a JSON array and
 must answer in a fixed schema. A confidence below 0.7 sends the row to the human review queue. A
 human recategorization adds a rule.
+
+**Bank feed (Plaid sandbox, Phase 8).** `POST /bank-feed/plaid/sync` (owner/accountant, audited)
+creates a Plaid sandbox Item for the custom user loaded with `seed/golden/plaid_feed.json`, exchanges
+the public token, reads `/transactions/get` (retrying while the product is not ready) and maps each
+transaction to the same `ParsedRow` a CSV produces: Plaid's positive-is-outflow amount becomes signed
+integer cents (JSON parsed as Decimal), pending rows are dropped, and there is no running balance.
+`ingestion.pipeline.ingest_rows` is shared with the CSV path, so dedup, invoice linking, counterparty
+matching and categorization are identical, then the engine refreshes. The host is the constant
+`https://sandbox.plaid.com` and the access token lives only for the request. Real bank connections
+stay out of scope (SPEC §2).
 
 **Recurring detection** (`recurring.py`). Transactions are grouped by (counterparty, category). A
 group is a series when every amount is within ±10% of the median, the gaps match a weekly, monthly
