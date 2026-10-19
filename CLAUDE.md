@@ -28,7 +28,7 @@ Read `SPEC.md` before any task. It is the source of truth. If a request conflict
 - Message format: `phase N: <short summary>`, e.g. `phase 1: csv ingestion + categorization`.
 - No `Co-Authored-By` or other attribution lines in commit messages or PR descriptions (disabled in `.claude/settings.json`).
 - Never commit `.env`, `.venv`, `node_modules` or secrets. Check `git status` before each commit.
-- Push to origin main after every commit (phase or docs), but only if tests are green and the safety checks pass: `git ls-files` has no `.env`/`.venv`/secrets, `git log --format='%an <%ae>' | sort -u` shows only the owner, and no commit message contains `Co-Authored-By`. If a check fails, don't push; report it.
+- Push to origin main after every commit (phase or docs), but only if tests are green and the safety checks pass: `git ls-files` has no `.env`/`.venv`/secrets, `git log --format='%an <%ae>' | sort -u` shows only the owners (the first commit's author and `hacksutates`), and no commit message contains `Co-Authored-By`. If a check fails, don't push; report it.
 
 ## Commands
 - Backend: `cd backend && uvicorn app.main:app --reload`

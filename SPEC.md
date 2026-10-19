@@ -31,6 +31,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 
 ### In scope (MVP)
 - CSV bank-statement upload + seeded golden data
+- Plaid **sandbox** bank feed (`POST /bank-feed/plaid/sync`): a fictional statement (`seed/golden/plaid_feed.json`) loaded into Plaid's custom sandbox user and read back through Plaid's Transactions API, then the same ingestion as a CSV. Sandbox host only, hard-coded; no real banks
 - Categorization (rules first, LLM fallback, low-confidence → review queue)
 - Recurring payment detection
 - Receivables (AR) & payables (AP) invoices
@@ -48,7 +49,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 - Today home screen (Phase 6c): up to 3 decisions with one-tap prepared actions, safe to spend this week, where last month's money went (§6.9)
 
 ### Explicitly OUT of scope — do not build
-Real bank connections, real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
+Real bank connections (the Plaid feed is sandbox-only), real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
 Team roster is a fixed, labelled breakdown of the payroll series for display and what-if prompts; not a staff data model. (No staff table, HR records or payroll processing: §6.9 Team.)
 
 ---
@@ -136,6 +137,7 @@ All money stored as integer **minor units** (cents) + `currency` (ISO 4217). Nev
 
 ### 6.1 Ingestion
 - CSV parser tolerant of column-name variants (date/amount/description/balance; debit+credit split columns).
+- Plaid sandbox feed: Plaid amounts (positive = money out, parsed as Decimal) → signed integer cents; pending rows dropped; no running balance; deduplicated against rows already imported exactly like a CSV.
 - Normalizer: uppercase, strip card prefixes/terminal IDs/dates from descriptions → `normalized_name`; match to counterparties by exact then fuzzy (rapidfuzz ≥ 90).
 
 ### 6.2 Categorization

@@ -214,6 +214,19 @@ export function useUpload() {
   });
 }
 
+export function usePlaidSync() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<Schemas["UploadOut"]> => {
+      const response = await fetch("/api/backend/bank-feed/plaid/sync", { method: "POST" });
+      const body = await response.json().catch(() => undefined);
+      if (!response.ok) throw new ApiError(response.status, detailOf(body));
+      return body;
+    },
+    onSuccess: () => void queryClient.invalidateQueries(),
+  });
+}
+
 export function useResetDemo() {
   const queryClient = useQueryClient();
   return useMutation({

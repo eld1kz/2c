@@ -12,7 +12,7 @@ OWNERS = {"app/services/action_service.py", "app/db/models.py"}
 
 
 def _modules() -> dict[str, ast.Module]:
-    return {str(p.relative_to(APP.parent)): ast.parse(p.read_text()) for p in APP.rglob("*.py")}
+    return {p.relative_to(APP.parent).as_posix(): ast.parse(p.read_text(encoding="utf-8")) for p in APP.rglob("*.py")}
 
 
 def test_sandbox_executors_imported_only_by_action_service() -> None:

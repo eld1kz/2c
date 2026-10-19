@@ -30,8 +30,19 @@ def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     def blocked(*args: object, **kwargs: object) -> None:
         raise RuntimeError("network access is disabled in tests")
 
+    real_connect, real_socketpair = socket.socket.connect, socket.socketpair
+
+    def loopback_pair(*args: object, **kwargs: object) -> tuple[socket.socket, socket.socket]:
+        """On Windows socketpair() connects over loopback (asyncio's self-pipe); that is not network."""
+        socket.socket.connect = real_connect  # type: ignore[method-assign]
+        try:
+            return real_socketpair(*args, **kwargs)  # type: ignore[arg-type]
+        finally:
+            socket.socket.connect = blocked  # type: ignore[method-assign,assignment]
+
     monkeypatch.setattr(socket.socket, "connect", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
+    monkeypatch.setattr(socket, "socketpair", loopback_pair)
 
 
 @pytest.fixture

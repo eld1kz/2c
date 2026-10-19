@@ -46,7 +46,7 @@ def test_export_holds_every_sandbox_operation_action_and_audit_event(client: Tes
     assert [e["hash"] for e in exported] == [e.hash for e in events]
     email = next(item["row"] for item in lines if item["kind"] == "sandbox_email")
     assert email["status"] == "sent" and email["action_id"] in {i["row"]["id"] for i in lines if i["kind"] == "action"}
-    assert anchor == json.loads((tmp_path / ev.ANCHOR_NAME).read_text())
+    assert anchor == json.loads((tmp_path / ev.ANCHOR_NAME).read_text(encoding="utf-8"))
     assert (anchor["head_seq"], anchor["head_hash"], anchor["events"]) == (events[-1].seq, events[-1].hash, len(events))
     assert anchor["export_sha256"] == hashlib.sha256((tmp_path / anchor["export_file"]).read_bytes()).hexdigest()
 

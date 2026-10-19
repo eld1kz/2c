@@ -1,12 +1,12 @@
 "use client";
 
-import { FileSpreadsheetIcon, UploadIcon } from "lucide-react";
+import { FileSpreadsheetIcon, LandmarkIcon, UploadIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
-import { useMe, useUpload } from "@/lib/api/hooks";
+import { useMe, usePlaidSync, useUpload } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
 import { previewCsv, type CsvPreview } from "@/lib/csv-preview";
 
@@ -14,6 +14,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // the server's limit (backend/app/ingestion/
 
 function problem(error: unknown): string {
   if (error instanceof ApiError && error.status === 403) return "Only owners and accountants can import statements; this attempt was logged.";
+  if (error instanceof ApiError && error.status === 503) return "The bank feed isn't set up on this server (Plaid sandbox keys missing).";
   if (error instanceof ApiError && error.status === 422) return `The file was rejected: ${error.message}. Nothing was imported.`;
   if (error instanceof ApiError) return error.message;
   return "The upload didn't finish. Check your connection and try again.";
@@ -23,6 +24,7 @@ export function UploadView() {
   const role = useMe().data?.user.role;
   const allowed = role === "owner" || role === "accountant";
   const upload = useUpload();
+  const sync = usePlaidSync();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function UploadView() {
 
   async function choose(f: File | undefined) {
     upload.reset();
+    sync.reset();
     setFile(null);
     setPreview(null);
     setError(null);
@@ -42,7 +45,8 @@ export function UploadView() {
     setPreview(p);
   }
 
-  const r = upload.data;
+  const r = upload.data ?? sync.data;
+  const failed = upload.isError ? upload.error : sync.isError ? sync.error : null;
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-semibold tracking-tight">Import a bank statement</h1>
@@ -77,6 +81,28 @@ export function UploadView() {
           <span className="text-xs text-ink-3">Nothing is imported until you confirm.</span>
           <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => void choose(e.target.files?.[0])} />
         </label>
+      )}
+
+      {allowed && !r && (
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line bg-surface px-5 py-4">
+          <div className="flex items-start gap-3">
+            <LandmarkIcon className="mt-0.5 size-5 text-ink-3" />
+            <div>
+              <h2 className="text-[15px] font-semibold">Or sync from your bank</h2>
+              <p className="text-xs text-ink-3">Pulls the latest transactions through Plaid&apos;s sandbox (test bank, no real money).</p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              upload.reset();
+              sync.mutate();
+            }}
+            disabled={sync.isPending || upload.isPending}
+          >
+            {sync.isPending ? "Syncing…" : "Sync bank feed"}
+          </Button>
+        </section>
       )}
 
       {error && (
@@ -125,9 +151,9 @@ export function UploadView() {
         </section>
       )}
 
-      {upload.isError && (
+      {failed && (
         <p role="alert" className="mt-4 rounded-lg bg-risk-soft px-3 py-2.5 text-sm text-risk-ink">
-          {problem(upload.error)}
+          {problem(failed)}
         </p>
       )}
 

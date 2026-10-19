@@ -122,6 +122,7 @@ Backend (`backend/.env` locally; environment variables in production):
 | `DAILY_LLM_BUDGET_USD` | Hard cap on LLM spend per UTC day (default 2; 5 on the demo) |
 | `DEMO_TODAY` | The fixed "today" of the golden data, `2026-10-01` |
 | `CORS_ORIGINS` | Comma-separated allowed origins |
+| `PLAID_CLIENT_ID`, `PLAID_SECRET` | Plaid **sandbox** keys (free: dashboard.plaid.com → Developers → Keys, Sandbox secret) for Import → "Sync bank feed". Without them the button reports "not set up". Only `sandbox.plaid.com` is ever called |
 | `APP_ENV` | `production` turns on the deployment rules: refuses development defaults, hides API docs, 300 chat turns/day, chat sessions per sign-in, no lockout for the public demo accounts |
 
 Frontend (`frontend/.env.local`): `BACKEND_URL` (where the gateway sends API calls),

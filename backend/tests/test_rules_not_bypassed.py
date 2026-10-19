@@ -40,12 +40,12 @@ def test_llm_cannot_override_rules() -> None:
 
 def _trees(*parts: str) -> dict[str, ast.AST]:
     files = [f for p in parts for f in sorted((APP / p).rglob("*.py"))]
-    return {str(f.relative_to(APP)): ast.parse(f.read_text()) for f in files}
+    return {f.relative_to(APP).as_posix(): ast.parse(f.read_text(encoding="utf-8")) for f in files}
 
 
 def test_no_float_in_money_paths() -> None:
     for name in ("ingestion/csv_parser.py", "ingestion/pipeline.py", "engine/recurring.py"):
-        tree = ast.parse((APP / name).read_text())
+        tree = ast.parse((APP / name).read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             assert not (isinstance(node, ast.Name) and node.id in {"float", "Decimal"}), name
             assert not (isinstance(node, ast.Constant) and isinstance(node.value, float)), name

@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     demo_today: date = DEFAULT_DEMO_TODAY
     cors_origins: str = "http://localhost:3000"
+    # Plaid sandbox bank feed (POST /bank-feed/plaid/sync). Sandbox keys only: the host is fixed to
+    # sandbox.plaid.com in app/ingestion/plaid_feed.py, there is no production setting.
+    plaid_client_id: str = ""
+    plaid_secret: str = ""
 
 
     @property
