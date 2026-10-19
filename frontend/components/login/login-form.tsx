@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { safeNext } from "@/lib/safe-next";
@@ -12,12 +12,18 @@ const DEMO_USERS = [
   { role: "Viewer", email: "viewer@emberoak.demo", can: "Read-only" },
 ];
 
+const noop = () => () => {};
+
+/** False in the server HTML and until React hydrates, then true: nothing can submit before the JS handler exists. */
+const useHydrated = () => useSyncExternalStore(noop, () => true, () => false);
+
 export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
   const next = safeNext(useSearchParams().get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ready = useHydrated();
 
   async function signIn(e: string, p: string) {
     setBusy(true);
@@ -44,7 +50,10 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
 
   return (
     <div className="w-full max-w-sm">
+      {/* method="post" and unnamed inputs: even a native submission never puts the email or password in the URL */}
       <form
+        method="post"
+        action="/login"
         onSubmit={(ev) => {
           ev.preventDefault();
           void signIn(email, password);
@@ -78,7 +87,7 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
             {error}
           </p>
         )}
-        <Button type="submit" size="lg" className="w-full" disabled={busy}>
+        <Button type="submit" size="lg" className="w-full" disabled={busy || !ready}>
           {busy ? "Signing in…" : "Sign in"}
         </Button>
       </form>
@@ -92,7 +101,7 @@ export function LoginForm({ demoPassword }: { demoPassword: string | null }) {
               <button
                 key={u.email}
                 type="button"
-                disabled={busy}
+                disabled={busy || !ready}
                 onClick={() => void signIn(u.email, demoPassword)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-sunken disabled:opacity-50"
               >
