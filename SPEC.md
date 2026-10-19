@@ -17,7 +17,7 @@ Every feature must feed one of these rows. If it doesn't, it's out.
 | Task completion (40%) | Golden demo: agent finds and fixes 4 planted problems end to end |
 | Security & compliance (30%) | Policy gate, permission tiers, hash-chained audit log, PII masking, injection defense, RBAC |
 | Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) |
-| Execution evidence | Sandbox bank writes its own logs; export script produces JSONL evidence |
+| Execution evidence | Sandbox bank writes its own logs; export script produces JSONL evidence (committed export from the local stack) |
 | Test cases | Golden dataset + adversarial tests (same scenarios as the demo) |
 | Security self-assessment | `docs/threat-model.md`, grown alongside the code |
 | Challenge bonus (optional) | Testnet stablecoin settlement of one invoice — only if everything else is done (not built) |
@@ -61,7 +61,7 @@ Real bank connections, real money, tax filing, payroll, multi-company, Telegram/
 | DB | Postgres (Docker Postgres, locally and in prod) |
 | LLM | Anthropic Claude API via official Python SDK; model from env `LLM_MODEL` |
 | Tests | pytest (backend); Vitest + Playwright (frontend) |
-| Deploy | One VPS in Singapore (Alibaba Cloud International; fallback Vultr/DigitalOcean Singapore), Docker Compose: Caddy (TLS) → Next.js → FastAPI → Postgres, custom domain. Chosen for reviewers in mainland China: `*.vercel.app` is blocked there, Hong Kong is not an Anthropic API region, and mainland hosting needs an ICP filing (`deploy/`, README → Deploy) |
+| Deploy | Ready, not deployed for the submission: it runs locally (Postgres in Docker Compose, API and web app on the host; README → Run it locally). Target when deployed: one VPS in Singapore (Alibaba Cloud International; fallback Vultr/DigitalOcean Singapore), Docker Compose: Caddy (TLS) → Next.js → FastAPI → Postgres, custom domain. Chosen for reviewers in mainland China: `*.vercel.app` is blocked there, Hong Kong is not an Anthropic API region, and mainland hosting needs an ICP filing (`deploy/`, README → Deploy) |
 
 Determinism: the app has a configurable `DEMO_TODAY` (default `2026-10-01`) so forecasts, overdue days and tests are reproducible.
 

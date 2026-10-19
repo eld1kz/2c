@@ -16,7 +16,7 @@ flowchart LR
         UI["Next.js pages<br/>dashboard · chat · approvals · audit · what-if · memo"]
     end
 
-    subgraph Server["One server (Singapore), Docker Compose"]
+    subgraph Server["Production stack (deploy/, ready, not deployed): one server, Docker Compose"]
         Caddy["Caddy<br/>TLS · security headers · per-IP rate limits"]
         subgraph Web["Next.js server"]
             Login["/api/auth/*<br/>sets httpOnly session cookie"]
@@ -226,7 +226,12 @@ mechanisms:
 
 ## Deployment
 
-Production runs as one Docker Compose stack (`deploy/docker-compose.prod.yml`) on a Singapore VPS
+For the submission the app runs locally: Postgres in Docker Compose (`docker-compose.yml`), the API
+(uvicorn) and the web app (`next dev`) on the host, with the same code paths; the committed evidence
+export comes from that stack. The production setup below is in the repository and ready to deploy,
+but was not deployed.
+
+Production would run as one Docker Compose stack (`deploy/docker-compose.prod.yml`) on a Singapore VPS
 with a custom domain. Singapore, not Hong Kong (the Anthropic API isn't offered there) and not
 `*.vercel.app` (blocked in mainland China), because reviewers are likely in mainland China. Caddy
 terminates TLS. `APP_ENV=production` makes the API refuse to boot on development defaults. A host

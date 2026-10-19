@@ -9,7 +9,9 @@ Roasters). Every "world-changing" effect is a row in a sandbox table: no real ba
 is ever touched. The three demo accounts are public by design. The main things to protect are
 **(1) that no payment, email or application happens without an authorized human's approval and
 within policy**, **(2) the integrity of the audit trail**, and **(3) that every number the AI states
-is real**. Secondary concerns are PII going to the LLM, cost abuse, and the deployed demo staying usable.
+is real**. Secondary concerns are PII going to the LLM, cost abuse, and a shared demo staying usable. For the submission the app runs locally; the production stack in
+`deploy/` is ready but not deployed, so the deployment controls below (Caddy, cron reset, `APP_ENV=production`)
+describe that stack.
 
 ## Permission tiers
 
@@ -81,7 +83,7 @@ We are stating these openly rather than hiding them.
    are exempt from it (their password is public, so a lockout protects nothing and would let anyone
    lock out every visitor); per-IP rate limits at Caddy remain.
 2. **Shared public accounts.** Anyone can approve or reject the planted actions. Every effect is
-   sandbox-only and fictional, the daily AI budget caps spend, and the data resets every 3 hours (the
+   sandbox-only and fictional, the daily AI budget caps spend, and the data resets every 3 hours on a deployed instance (locally: the owner's reset button or `seed.reset`; the
    audit log is kept and gains a `demo_reset` event). On the deployed demo, chat conversations and the
    one-turn lock are per sign-in, so visitors don't see or block each other's chats. They do share
    the per-user turn quota (10/min, 300/day for the owner account).
@@ -121,6 +123,6 @@ We are stating these openly rather than hiding them.
 - `cd backend && pytest -q`: the whole suite, including A1–A5 (no network needed).
 - `GET /audit/verify` or the "Verify chain" button on `/audit`.
 - `python -m app.sandbox.evidence_export --check-file evidence/<file>.jsonl --anchor evidence/anchor.json`
-  recomputes the committed chain without a database.
+  recomputes the committed chain without a database (the committed export is from the local stack).
 - `scripts/check_deploy.sh <domain> <ip>` checks TLS, headers, the cookie, the gateway and closed ports
-  on the deployed instance.
+  on a deployed instance (not used for the submission).

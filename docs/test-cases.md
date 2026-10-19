@@ -10,7 +10,8 @@ How to run:
 - Browser tests against the running dev stack: `cd frontend && npx playwright test`
 - Live end-to-end runs with the real model (spend a few cents of the daily AI budget):
   `LIVE=1 npx playwright test e2e/live-p1.spec.ts e2e/live-p4.spec.ts --project=desktop`
-  (add `E2E_BASE_URL=https://<domain>` to run them against the deployed instance)
+  (add `KEEP_STATE=1` to stop P4 before its reset, as for the committed evidence export; add
+  `E2E_BASE_URL=https://<domain>` to run them against a deployed instance)
 
 ## Golden scenarios
 

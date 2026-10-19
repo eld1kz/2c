@@ -140,18 +140,21 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - Oct 19: the raise chip is 3% (a 5% raise misses the cushion by $34.52 in week 9 on the golden data even with the fixes), so one chip answers Yes once Today's fixes succeed. Code freeze after this: bug fixes only.
 
 ## Phase 7 — Ship  *(Oct 18–20)*
-- Deploy: one Singapore VPS with Docker Compose (Caddy → Next.js → FastAPI → Postgres) and a custom domain, reachable from mainland China (SPEC §3). README with setup/deploy/tests.
+
+**Oct 19: deployment skipped for the submission.** The product runs locally: Postgres in Docker Compose, with the API and the web app on the host (README → Run it locally; checked from a fresh clone and an empty database). The production stack (`deploy/`, `scripts/deploy.sh`, `scripts/check_deploy.sh`, `scripts/fetch_evidence.sh`, the cron reset) stays in the repository, tested and ready to deploy. The committed evidence export comes from the local stack: live P1 (ends with a reset), then live P4 with `KEEP_STATE=1`, then `evidence_export`, `--verify-anchor` and `--check-file` (README → Execution evidence).
+
+- Deploy *(ready, not deployed)*: one Singapore VPS with Docker Compose (Caddy → Next.js → FastAPI → Postgres) and a custom domain, reachable from mainland China (SPEC §3). README with setup/deploy/tests.
 - Demo safety on the deployed instance (`APP_ENV=production`): automatic demo reset every 3 h (host cron, `seed.reset --scheduled`) plus the owner button, login-page note; `DAILY_LLM_BUDGET_USD=5` and a separate Anthropic key with a $50/month cap; per-IP limits at Caddy; demo accounts exempt from the email lockout; 300 chat turns/day; chat lock and conversations per sign-in session, not per user; boot refuses development defaults.
 - Before going public: gitleaks over the full history (also in `scripts/ship.sh`), third-party license check, `LICENSE` (all rights reserved, source provided for competition review).
 - `docs/architecture.md`, `docs/security-assessment.md` (from threat model), evidence export JSONL.
 - Deck + demo video (script: P1 → P2 → P3 → P4 → A1 → audit verify): Mon Oct 19 evening – Tue Oct 20.
 - **Demo reset** *(done early, after Phase 5: `POST /demo/reset` owner-only button + `python -m seed.reset`; `tests/test_demo_reset.py`).* Judges sign in as the public demo owner and approve things, so the deployed instance needs a way back to the golden state. Pick one in the Phase 7 plan: an owner-only "Reset demo data" action (audited), or an automatic reset every few hours on the deployed instance. Either way the reset restores business data (transactions, invoices, insights, actions, sandbox rows) from the golden seed and never deletes or rewrites AuditEvents: the chain stays append-only, gains a `demo_reset` event, and `/audit/verify` still passes afterwards. It is a maintenance path outside ActionService, so it must be the only code that clears Sandbox* tables, and it needs a test for both properties.
-- **Submit Tue Oct 20 evening Seoul time, not at the deadline.** Before submitting: run the golden flow on the deployed instance, export the evidence right after it (before the next scheduled reset clears the sandbox rows), verify it against the live DB, commit export + anchor.
+- **Submit Tue Oct 20 evening Seoul time, not at the deadline.** Before submitting: run the golden flow, export the evidence right after it (before a reset clears the sandbox rows), verify it against the DB, commit export + anchor. *Done Oct 19 on the local stack (`a14e250`).*
 
 **Acceptance**
 - `backend/tests/test_production.py`, `test_evidence_export.py`, `test_test_cases_doc.py` and the scheduled-reset test pass; `scripts/ship.sh` green.
-- Deployed: `scripts/check_deploy.sh <domain> <ip>` all ok; `E2E_BASE_URL=https://<domain> LIVE=1 npx playwright test e2e/live-p4.spec.ts --project=desktop` passes; a `scheduler:demo_reset` event appears in the audit log and `/audit/verify` passes.
-- China reachability: mainland multi-node probes (itdog.cn / boce.com) return 200 from ≥ 90% of China Telecom, Unicom and Mobile nodes with median load < 2 s, daytime and 20:00–23:00 Beijing; DNS resolves to the server.
-- `evidence/` export + `anchor.json` committed; `--check-file` and `--verify-anchor` pass.
+- Deployed *(not run: deployment skipped for the submission)*: `scripts/check_deploy.sh <domain> <ip>` all ok; `E2E_BASE_URL=https://<domain> LIVE=1 npx playwright test e2e/live-p4.spec.ts --project=desktop` passes; a `scheduler:demo_reset` event appears in the audit log and `/audit/verify` passes.
+- China reachability *(not run: deployment skipped)*: mainland multi-node probes (itdog.cn / boce.com) return 200 from ≥ 90% of China Telecom, Unicom and Mobile nodes with median load < 2 s, daytime and 20:00–23:00 Beijing; DNS resolves to the server.
+- `evidence/` export + `anchor.json` committed; `--check-file` and `--verify-anchor` pass. *Done: export from the local stack, 1,690 audit events.*
 
 **Cut order if behind:** on-chain bonus → Phase 6b-2 → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.

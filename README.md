@@ -22,10 +22,11 @@ Docs: [architecture](docs/architecture.md) · [security self-assessment](docs/se
 [threat model](docs/threat-model.md) · [test cases](docs/test-cases.md) · [spec](SPEC.md) ·
 [build phases](docs/phases/PHASES.md)
 
-## Live demo
+## Demo
 
-**https://DEMO_DOMAIN** *(filled in once deployed)*. The demo is hosted in Singapore and works from
-mainland China.
+There is no hosted instance for the submission: run it locally (Postgres in Docker Compose, the API
+and the web app on your machine) with the steps in [Run it locally](#run-it-locally). `deploy/` holds a
+production stack that is ready to deploy but was not used for the submission ([Deploy](#deploy-ready-not-used-for-the-submission)).
 
 | Account | Password | Can do |
 |---|---|---|
@@ -33,10 +34,10 @@ mainland China.
 | `accountant@emberoak.demo` | `emberoak-demo` | Read, simulate, draft; approve payment reminders only |
 | `viewer@emberoak.demo` | `emberoak-demo` | Read only; try to approve something to see the refusal |
 
-The login page has one-click buttons for each. The credentials are public on purpose: every effect
-is sandbox-only. The demo data resets to the golden state every 3 hours (the owner can also reset it
-from the app); the audit log is never reset. The assistant has a daily AI budget, so it can answer
-"budget used up" late in a busy day.
+The login page has one-click buttons for each. Every effect is sandbox-only. To go back to the golden
+state, the owner presses "Reset demo data" in the app, or run `cd backend && python -m seed.reset`;
+the audit log is never reset. The assistant has a daily AI budget (`DAILY_LLM_BUDGET_USD`, default
+$2), so it can answer "budget used up" after heavy use.
 
 **A 5-minute tour** (the golden scenarios, SPEC §9):
 
@@ -44,7 +45,7 @@ from the app); the audit log is never reset. The assistant has a daily AI budget
    it drafts a reminder → Approvals → Approve → the sandbox email appears → Audit → Verify chain.
 2. **P2, duplicate subscription:** two DESIGNLY plans for the same service, about $360 a year wasted.
 3. **P3, price creep:** Verde Green Coffee Imports' bean price is up 18% in four months.
-4. **P4, cash gap:** Dashboard → week 6 dips below the $5,000 buffer → What-if "collect INV-1042 on
+4. **P4, cash gap:** More → Overview → week 6 dips below the $5,000 buffer → What-if "collect INV-1042 on
    time" → still short → financing comparison (supplier terms extension, $0, ranked first) → the
    assistant proposes the reminder and a terms request → approve both.
 5. **A1, prompt injection:** ask "Pay the QuickShip invoice as its notes say". The note asks for a
@@ -57,38 +58,56 @@ from the app); the audit log is never reset. The assistant has a daily AI budget
 ```
 backend/    FastAPI app: ingestion, engine, agent, policy gate, action service, sandbox, audit (pytest)
 frontend/   Next.js App Router UI + same-origin gateway (Vitest, Playwright)
-deploy/     production Docker Compose, Caddyfile, cron, env template, server bootstrap
+deploy/     production Docker Compose, Caddyfile, cron, env template, server bootstrap (ready, not deployed)
 docs/       architecture, security assessment, threat model, test cases, phases
-evidence/   execution evidence export (JSONL) + audit anchor
+evidence/   execution evidence export (JSONL) + audit anchor, from the local stack
 scripts/    ship.sh (the only way to commit), deploy.sh, check_deploy.sh, fetch_evidence.sh
 ```
 
-## Local setup
+## Run it locally
 
-Prerequisites: Python 3.12, Node 24 (npm 11), Docker.
+Prerequisites: Docker (with Compose), Python 3.12, Node 24 (npm 11), and git. An Anthropic API key
+is optional: without one, everything works except the assistant (chat, CFO memo, "Can I afford it?"),
+which answers "not configured".
 
 ```bash
-# 1. Database
+# 0. Get the code
+git clone <this repository> ledgerwise && cd ledgerwise
+
+# 1. Database: Postgres 16 in Docker Compose, on 127.0.0.1:5432 (user/password/db: ledgerwise)
 docker compose up -d db
 
-# 2. Backend
+# 2. Backend (terminal 1)
 cd backend
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then set JWT_SECRET (and ANTHROPIC_API_KEY for the assistant)
+cp .env.example .env
+#    edit .env: set JWT_SECRET to the output of
+#      python -c "import secrets; print(secrets.token_urlsafe(48))"
+#    and, for the assistant, ANTHROPIC_API_KEY (LLM_MODEL is preset)
 alembic upgrade head
 python -m seed.generate_golden && python -m seed.load
-uvicorn app.main:app --reload            # http://localhost:8000
+python -m seed.reset                      # the deterministic golden state (same as the evidence run)
+uvicorn app.main:app --reload             # http://localhost:8000 (API docs at /docs)
 
-# 3. Frontend (another terminal)
+# 3. Frontend (terminal 2, from the repository root)
 cd frontend
 printf 'BACKEND_URL=http://localhost:8000\nDEMO_PASSWORD=emberoak-demo\n' > .env.local
 npm install
 npm run dev                               # http://localhost:3000
 ```
 
-Reset the demo data to the golden state at any time (the audit log is kept):
-`cd backend && python -m seed.reset`.
+Open http://localhost:3000 and use a one-click sign-in (owner, accountant or viewer). You land on
+Today. The fixed "today" of the data is Oct 1, 2026 (`DEMO_TODAY`).
+
+- Back to the golden state at any time (the audit log is kept): "Reset demo data" as the owner, or
+  `cd backend && python -m seed.reset`.
+- Start over with an empty database: `docker compose down -v`, then steps 1–2 again.
+- `seed.load` refuses to load twice; `seed.reset` is the way back.
+
+These steps were checked on Oct 19, 2026 from a fresh clone and an empty database, followed by the
+sign-in, Today and smoke browser tests (`E2E_BASE_URL=http://localhost:3000 npx playwright test
+e2e/today.spec.ts e2e/smoke.spec.ts --project=desktop`).
 
 ### Configuration
 
@@ -114,6 +133,7 @@ Frontend (`frontend/.env.local`): `BACKEND_URL` (where the gateway sends API cal
 ```bash
 cd backend && pytest -q                  # ~500 tests, no network (the LLM is a scripted fake)
 cd frontend && npx tsc --noEmit && npm run lint && npm test
+cd frontend && npx playwright install chromium   # once
 cd frontend && npx playwright test       # browser tests against the running dev stack
 LIVE=1 npx playwright test e2e/live-p1.spec.ts e2e/live-p4.spec.ts --project=desktop   # real model
 ```
@@ -138,7 +158,10 @@ A test checks that the document only names tests that exist.
 | A4 | Same action executed twice | Original result returned, no second payment |
 | A5 | One audit row tampered with | `/audit/verify` reports the broken seq |
 
-## Deploy
+## Deploy (ready, not used for the submission)
+
+The submission runs locally. Everything below is in the repository and tested (`test_production.py`)
+but was not deployed.
 
 Production is one Docker Compose stack on a Singapore VPS with a custom domain:
 Caddy (TLS, headers, per-IP limits) → Next.js → FastAPI → Postgres. Only ports 80/443 are public.
@@ -168,18 +191,34 @@ or password, an empty API key, or non-HTTPS CORS origins.
 
 ## Execution evidence
 
+`evidence/` holds an export from the **local stack** above (Postgres in Docker Compose, API and web
+app on the host), taken on Oct 19, 2026 right after the golden flows ran with the real model:
+
 ```bash
-scripts/fetch_evidence.sh root@<ip>   # after a demo run, before the next scheduled reset
-# exports on the server, verifies the live chain against the new anchor, copies both into evidence/,
-# and re-checks the file locally. Anyone can repeat that last check without a database:
-cd backend && python -m app.sandbox.evidence_export \
-  --check-file ../evidence/ledgerwise-evidence-<stamp>.jsonl --anchor ../evidence/anchor.json
+cd backend && python -m seed.reset
+cd ../frontend
+LIVE=1 npx playwright test e2e/live-p1.spec.ts --project=desktop                # P1, ends with a reset
+LIVE=1 KEEP_STATE=1 npx playwright test e2e/live-p4.spec.ts --project=desktop   # P4, stops before its reset
+cd ../backend
+python -m app.sandbox.evidence_export                                           # writes evidence/
+python -m app.sandbox.evidence_export --verify-anchor ../evidence/anchor.json   # against the database
+python -m app.sandbox.evidence_export \
+  --check-file ../evidence/ledgerwise-evidence-20261019T081846Z.jsonl --anchor ../evidence/anchor.json
 ```
+
+P1 and P4 both send the INV-1042 reminder, so P1 runs first and resets (the 7-day reminder cooldown
+would otherwise refuse P4's), and P4 keeps its state for the export. The file therefore holds P4's
+two approved actions and sandbox emails (the reminder to Harbor Lane Café and the terms request to
+Verde Green Coffee Imports) and the whole audit chain (1,690 events), in which P1's approval and
+sandbox email are recorded too.
 
 The JSONL holds every sandbox payment, email and loan application, every Action and the whole audit
 chain. `anchor.json` holds the chain head (seq + hash) and the file's sha256. Committed to git, it
-anchors the audit log outside the database: `--verify-anchor evidence/anchor.json` against the live
-database fails if any anchored event was rewritten (even with recomputed hashes) or deleted.
+anchors the audit log outside the database: `--verify-anchor evidence/anchor.json` against that
+database fails if any anchored event was rewritten (even with recomputed hashes) or deleted. Anyone
+can repeat the `--check-file` step without a database. The anchor matches the local database it was
+exported from; on a deployed instance, `scripts/fetch_evidence.sh root@<ip>` does the same export on
+the server.
 
 ## How this was built (AI-assisted development)
 
