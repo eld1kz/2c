@@ -66,8 +66,8 @@ flowchart LR
 
 | Path | What it holds |
 |---|---|
-| `backend/app/ingestion/` | CSV parser (column variants, debit/credit split, integer cents), description normalizer, counterparty matching |
-| `backend/app/engine/` | Deterministic engine: categorization, recurring detection, counterparty stats, forecast, what-if, insights, financing, memo facts |
+| `backend/app/ingestion/` | CSV parser (column variants, debit/credit split, integer cents), Plaid sandbox feed (`plaid_feed.py`), description normalizer, counterparty matching |
+| `backend/app/engine/` | Deterministic engine: categorization, recurring detection, counterparty stats, forecast, what-if, approval impact (`impact.py`), insights, financing, memo facts |
 | `backend/app/agent/` | Tool-use loop, tool schemas and dispatch, system prompt, PII masking, citation checks |
 | `backend/app/policy/` | Tool → tier table, closed EXECUTE parameter schemas, the gate, numeric limits |
 | `backend/app/services/` | `action_service.py` (the only path that executes anything), drafts, ledger reads, memo, demo reset, LLM budget |
@@ -107,6 +107,16 @@ rows no rule covers go to the LLM classifier, which sees normalized text inside 
 must answer in a fixed schema. A confidence below 0.7 sends the row to the human review queue. A
 human recategorization adds a rule.
 
+**Bank feed (Plaid sandbox, Phase 8).** `POST /bank-feed/plaid/sync` (owner/accountant, audited)
+creates a Plaid sandbox Item for the custom user loaded with `seed/golden/plaid_feed.json`, exchanges
+the public token, reads `/transactions/get` (retrying while the product is not ready) and maps each
+transaction to the same `ParsedRow` a CSV produces: Plaid's positive-is-outflow amount becomes signed
+integer cents (JSON parsed as Decimal), pending rows are dropped, and there is no running balance.
+`ingestion.pipeline.ingest_rows` is shared with the CSV path, so dedup, invoice linking, counterparty
+matching and categorization are identical, then the engine refreshes. The host is the constant
+`https://sandbox.plaid.com` and the access token lives only for the request. Real bank connections
+stay out of scope (SPEC §2).
+
 **Recurring detection** (`recurring.py`). Transactions are grouped by (counterparty, category). A
 group is a series when every amount is within ±10% of the median, the gaps match a weekly, monthly
 or quarterly cadence, and there are at least 3 occurrences (2 for quarterly). Invoice-linked rows are
@@ -134,6 +144,12 @@ revenue, delay a receivable, remove a series, or a one-off payment. Base lines a
 the diff is exactly the scenario lines and the sum invariant still holds. Nothing is written to the
 database. Inputs are ids, dates, enums and integer cents only (no free text), bounded to the 13-week
 horizon and $1,000,000 (`services/scenarios.py`).
+
+**Approval impact** (`impact.py`, `services/action_impact.py`, Phase 9). A proposed `send_reminder`
+is run as `CollectReceivable(today)` and a `send_terms_request` as `DelaySupplierPayments(+30 days)`,
+the same scenarios as Today's fixes. The approval card gets the lowest week before and after, the
+weeks below the cushion before and after, and the week-13 change. Other actions and decided ones get
+no preview. Nothing is written and no model is called.
 
 **Insights** (`engine/insights/`). A fixed catalog; each detector returns an impact in cents and
 evidence ids.
@@ -221,7 +237,13 @@ mechanisms:
    still passes `/audit/verify`, but no longer matches the anchor (`--verify-anchor`).
 6. **Web session**: an httpOnly, Secure, SameSite=Strict cookie; a same-origin gateway with a route
    allowlist and Origin checks; no raw HTML or links in rendered answers.
-7. **Abuse limits**: per-user chat limits (10/min, 100/day; 300/day on the public demo), one turn in
+7. **Trust & guardrails page** (`GET /trust`, `services/trust.py`, Phase 9): every role can see what
+   the assistant may do. The tool tiers and role permissions are computed from `TOOL_TIERS`,
+   `can_propose` and `can_approve`, the same code the gate uses, so the page cannot drift from it. It
+   also shows the Policy and agent limits, audit-log counts for this business (proposals, approvals,
+   gate denials, role refusals, citation failures), the last 5 gate denials and `verify_chain`.
+   Read-only, no model.
+8. **Abuse limits**: per-user chat limits (10/min, 100/day; 300/day on the public demo), one turn in
    flight per sign-in, the daily AI budget, per-IP limits at Caddy, and upload size and type limits.
 
 ## Deployment

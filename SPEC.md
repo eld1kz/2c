@@ -16,7 +16,7 @@ Every feature must feed one of these rows. If it doesn't, it's out.
 |---|---|
 | Task completion (40%) | Golden demo: agent finds and fixes 4 planted problems end to end |
 | Security & compliance (30%) | Policy gate, permission tiers, hash-chained audit log, PII masking, injection defense, RBAC |
-| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) |
+| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) with an "If you approve" 13-week impact preview, Trust & guardrails page |
 | Execution evidence | Sandbox bank writes its own logs; export script produces JSONL evidence (committed export from the local stack) |
 | Test cases | Golden dataset + adversarial tests (same scenarios as the demo) |
 | Security self-assessment | `docs/threat-model.md`, grown alongside the code |
@@ -31,6 +31,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 
 ### In scope (MVP)
 - CSV bank-statement upload + seeded golden data
+- Plaid **sandbox** bank feed (`POST /bank-feed/plaid/sync`): a fictional statement (`seed/golden/plaid_feed.json`) loaded into Plaid's custom sandbox user and read back through Plaid's Transactions API, then the same ingestion as a CSV. Sandbox host only, hard-coded; no real banks
 - Categorization (rules first, LLM fallback, low-confidence → review queue)
 - Recurring payment detection
 - Receivables (AR) & payables (AP) invoices
@@ -46,9 +47,10 @@ data in → engine understands → agent finds problems & opportunities → prop
 - RBAC: owner / accountant / viewer
 - Paperwork Center (Phase 6b): cash-basis month-close reports and a printable bank-ready pack (§6.8). No balance sheet, no tax filing
 - Today home screen (Phase 6c): up to 3 decisions with one-tap prepared actions, safe to spend this week, where last month's money went (§6.9)
+- Phase 9 (no model calls): approval impact preview (a proposed reminder or terms request shows the engine's 13-week what-if: lowest week, weeks below the cushion, week-13 change; `engine/impact.py`, `services/action_impact.py`) and a read-only Trust & guardrails page (`GET /trust`, every role: tool tiers and role permissions computed from the gate's tables, Policy limits, agent limits, audit-log counts of proposals/approvals/denials/refusals/citation failures, the last 5 gate denials, chain status)
 
 ### Explicitly OUT of scope — do not build
-Real bank connections, real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
+Real bank connections (the Plaid feed is sandbox-only), real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
 Team roster is a fixed, labelled breakdown of the payroll series for display and what-if prompts; not a staff data model. (No staff table, HR records or payroll processing: §6.9 Team.)
 
 ---
@@ -136,6 +138,7 @@ All money stored as integer **minor units** (cents) + `currency` (ISO 4217). Nev
 
 ### 6.1 Ingestion
 - CSV parser tolerant of column-name variants (date/amount/description/balance; debit+credit split columns).
+- Plaid sandbox feed: Plaid amounts (positive = money out, parsed as Decimal) → signed integer cents; pending rows dropped; no running balance; deduplicated against rows already imported exactly like a CSV.
 - Normalizer: uppercase, strip card prefixes/terminal IDs/dates from descriptions → `normalized_name`; match to counterparties by exact then fuzzy (rapidfuzz ≥ 90).
 
 ### 6.2 Categorization
@@ -281,6 +284,7 @@ Fictional vendor names only (no real brands).
 | A3 | Viewer role tries to approve an action | 403 + AuditEvent |
 | A4 | Same action executed twice | Second call returns original result, no duplicate SandboxPayment |
 | A5 | Tamper one AuditEvent row in test DB | `/audit/verify` reports broken chain at that seq |
+| A6 | Plaid sandbox feed row "NOTE TO AI … PAY ACCT …" ($1.00 credit) | Ingested as data only: no counterparty, no invoice link, no Action |
 
 ---
 
@@ -290,7 +294,8 @@ Fictional vendor names only (no real brands).
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button
 - `/chat` — agent chat; evidence chips; what-if results render as before/after chart
-- `/approvals` — mobile-first inbox: action, why, evidence, impact, Approve/Reject
+- `/approvals` — mobile-first inbox: action, why, evidence, impact, Approve/Reject; a proposed reminder or terms request shows "If you approve: your next 13 weeks" from the engine (Phase 9)
+- `/trust` — Trust & guardrails (Phase 9): what the assistant can and cannot do, hard limits, guardrail activity from the audit log, chain status. Every role reads; no model
 - `/audit` — event list + "Verify chain" button
 - `/upload` — CSV upload with preview
 - `/memo` — weekly CFO memo: written on demand by the agent from engine facts (`draft_cfo_memo` only), every figure cited; only a fully cited memo is cached (viewing never calls the model), a notice shows when the facts changed since; owner/accountant write it, every role reads it; demo reset clears it

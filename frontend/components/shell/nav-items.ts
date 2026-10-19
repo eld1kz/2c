@@ -1,4 +1,4 @@
-import { FileStackIcon, FileTextIcon, FlaskConicalIcon, InboxIcon, LayoutDashboardIcon, LightbulbIcon, MessageSquareTextIcon, ReceiptIcon, ScrollTextIcon, SunIcon, UploadIcon, UsersIcon } from "lucide-react";
+import { FileStackIcon, FileTextIcon, FlaskConicalIcon, InboxIcon, LayoutDashboardIcon, LightbulbIcon, MessageSquareTextIcon, ReceiptIcon, ScrollTextIcon, ShieldCheckIcon, SunIcon, UploadIcon, UsersIcon } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -21,4 +21,5 @@ export const NAV: NavItem[] = [
   { href: "/transactions", label: "Transactions", icon: ReceiptIcon, more: true },
   { href: "/upload", label: "Import", icon: UploadIcon, more: true },
   { href: "/audit", label: "Audit log", icon: ScrollTextIcon, more: true },
+  { href: "/trust", label: "Trust", icon: ShieldCheckIcon, more: true },
 ];

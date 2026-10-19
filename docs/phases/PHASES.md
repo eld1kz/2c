@@ -164,6 +164,8 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - Before going public: gitleaks over the full history (also in `scripts/ship.sh`), third-party license check, `LICENSE` (all rights reserved, source provided for competition review).
 - `docs/architecture.md`, `docs/security-assessment.md` (from threat model), evidence export JSONL.
 - Deck + demo video (script: P1 → P2 → P3 → P4 → A1 → audit verify): Mon Oct 19 evening – Tue Oct 20.
+  *Video: scripted recording of every screen, `demo/storyboard.yml` + `demo/record.sh` (shot-scraper video; Oct 20).*
+  > **Needs input from the team:** is the deck done, and where is it (file or link)? Where is the final video published?
 - **Demo reset** *(done early, after Phase 5: `POST /demo/reset` owner-only button + `python -m seed.reset`; `tests/test_demo_reset.py`).* Judges sign in as the public demo owner and approve things, so the deployed instance needs a way back to the golden state. Pick one in the Phase 7 plan: an owner-only "Reset demo data" action (audited), or an automatic reset every few hours on the deployed instance. Either way the reset restores business data (transactions, invoices, insights, actions, sandbox rows) from the golden seed and never deletes or rewrites AuditEvents: the chain stays append-only, gains a `demo_reset` event, and `/audit/verify` still passes afterwards. It is a maintenance path outside ActionService, so it must be the only code that clears Sandbox* tables, and it needs a test for both properties.
 - **Submit Tue Oct 20 evening Seoul time, not at the deadline.** Before submitting: run the golden flow, export the evidence right after it (before a reset clears the sandbox rows), verify it against the DB, commit export + anchor. *Done Oct 19 on the local stack (`a14e250`).*
 
@@ -174,3 +176,25 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - `evidence/` export + `anchor.json` committed; `--check-file` and `--verify-anchor` pass. *Done: export from the local stack, 1,690 audit events.*
 
 **Cut order if behind:** on-chain bonus → Phase 6b-2 → email sending → UNUSUAL_EXPENSE → CSV upload UI (keep seeded data). Never cut: policy gate, audit, golden demo flows.
+
+---
+
+## Phase 8 — Bank feed: Plaid sandbox  *(Oct 19)*
+- Data in from a bank API, not only CSV: Plaid **sandbox** (SPEC §2 amended: sandbox only, host hard-coded). Chosen over TrueLayer: server-side calls, instant keys, no browser OAuth.
+- `app/ingestion/plaid_feed.py` (client + mapping to `ParsedRow`), `pipeline.ingest_rows` shared with CSV, `POST /bank-feed/plaid/sync`, Import page "Sync bank feed", gateway allowlist.
+- Fictional feed in `seed/golden/plaid_feed.json` (Plaid custom user): 5 new rows, 4 replays of the golden CSV, adversarial row A6.
+- `python -m scripts.plaid_check`: one-command live dry run.
+- Windows support: portable tests (POSIX paths, UTF-8 reads, loopback socketpair allowed); `scripts/ship.sh` runs from Git Bash and pushes the current branch.
+
+**Acceptance**
+- `backend/tests/test_plaid_feed.py` passes; `python -m scripts.plaid_check` prints PASS against the live sandbox; "Sync bank feed" shows "Imported 5 of 9 rows"; `scripts/ship.sh` green. *Done Oct 19.*
+
+## Phase 9 — Trust page + approval impact preview  *(Oct 20)*
+- No Anthropic API calls (the remaining API budget is kept for the demo).
+- **Approval impact preview:** `engine/impact.py` summarizes a what-if (lowest week before/after, weeks below the cushion, week-13 change); `services/action_impact.py` maps a proposed `send_reminder` → `CollectReceivable(today)` and `send_terms_request` → `DelaySupplierPayments(+30)`, the same scenarios as Today's fixes; `ActionDisplayOut.impact`; "If you approve" block on the approval card.
+- **Trust & guardrails:** `GET /trust` (`services/trust.py`, `routes_trust.py`), every role, read-only: boundaries from `TOOL_TIERS` + `can_propose`/`can_approve`, Policy and agent limits, audit counts for this business, last 5 gate denials, `verify_chain`. `/trust` page under More; gateway allowlist `GET trust`.
+
+**Acceptance**
+- `backend/tests/test_action_impact.py`: INV-1042 reminder lifts week 13 by $4,800 and matches Today's fix scenario; Verde terms request reduces weeks below the cushion; price request and decided actions have no preview; `GET /actions` writes nothing and calls no model.
+- `backend/tests/test_trust.py`: every tool listed, no approve capability, A2 denial counted and shown, viewer refusal counted, other businesses not counted, A5 tamper reported, every role 200 with the Policy limits and no model call.
+- `frontend/e2e/trust.spec.ts`: owner and viewer see limits, tool table and an intact chain, no side scroll.

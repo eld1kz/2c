@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--browser",
+        "chromium",
+        "--viewport-size",
+        "1280x720",
+        "--caps",
+        "devtools",
+        "--output-dir",
+        "demo/out/mcp"
+      ]
+    }
+  }
+}

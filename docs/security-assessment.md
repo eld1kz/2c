@@ -37,6 +37,8 @@ The agent has **no approve capability**. Approvals exist only as authenticated H
 | Propose / approve payment reminders | — | ✓ | ✓ |
 | Propose / approve payments, loan applications, supplier terms requests | — | — | ✓ |
 | Reset the demo data | — | — | ✓ |
+| Trust page (`GET /trust`): boundaries, limits, guardrail activity, chain status | ✓ | ✓ | ✓ |
+| See the "If you approve" 13-week impact on an approval card | ✓ | ✓ | ✓ |
 
 Every refused attempt (wrong role, other business, bad input) returns 403/404/422 and is written to
 the audit log.
@@ -61,6 +63,7 @@ the audit log.
 |---|---|---|---|---|
 | T1 | Prompt injection through documents (invoice notes, descriptions) | Untrusted text reaches the model only as wrapped, cleaned data; closed EXECUTE schemas; the gate pays only stored details within outstanding; the engine never reads notes | A1: `test_gate.py`, `test_action_service.py`, `test_api.py`, `test_agent_a1.py` | Mitigated |
 | T2 | Agent acts without consent | EXECUTE only proposes; no approve tool; claim check on "sent/paid/done" | `test_agent_tools.py`, `test_action_service.py`, `test_citations.py` | Mitigated |
+| T16 | Bank-feed abuse (leaked keys, real bank, injected feed text) | Sandbox host hard-coded; keys in env only; access token never stored; feed rows take the CSV path (never mint counterparties); owner/accountant only, audited | A6: `test_plaid_feed.py` | Mitigated |
 | T3 | Excessive or split payments | Single and daily caps, amount ≤ outstanding, integer cents only | A2: `test_gate.py`, `test_action_service.py` | Mitigated |
 | T4 | Privilege escalation | RBAC on every route plus role checks in the gate; role re-read on every request | A3: `test_api.py`, `test_action_service.py`, `test_security_review.py` | Mitigated |
 | T5 | Duplicate execution | Idempotency keys, row locks, UNIQUE `action_id` on sandbox rows, replay returns the original | A4: `test_action_service.py` | Mitigated |
@@ -73,6 +76,7 @@ the audit log.
 | T12 | Stolen or forged session | bcrypt; pinned HS256 with a ≥ 32-char secret; 8 h tokens; login lockout (not for the public demo accounts in production) plus per-IP edge limits | `test_api.py`, `test_security_review.py`, `test_production.py` | Mitigated (demo-grade) |
 | T13 | XSS, CSRF, UI injection | httpOnly + SameSite=Strict + Secure cookie; same-origin gateway with route allowlist and Origin check; no raw HTML or links in answers; drafts dropped on `reset` | `frontend/tests/security.test.ts`, `chat-reducer.test.ts`, `e2e/chat.spec.ts` | Mitigated |
 | T14 | Exposed or misconfigured deployment | Only Caddy publishes 80/443; backend and DB on the internal network only; TLS + HSTS + `frame-ancestors 'none'`; API docs off; boot refuses default DB password, empty API key and non-HTTPS CORS; firewall; automatic security updates | `test_production.py`, `scripts/check_deploy.sh` | Mitigated |
+| T17 | Over-sharing on the Trust page; an impact preview read as a promise | Read-only, no model; only this business's audit events; denial reasons truncated, no contact data; boundaries computed from the gate's own tables; preview is the engine what-if (same scenarios as Today), labelled "assuming it succeeds", writes nothing | `test_trust.py`, `test_action_impact.py`, `e2e/trust.spec.ts` | Mitigated |
 
 ## Known residual risks
 
@@ -120,7 +124,8 @@ We are stating these openly rather than hiding them.
 
 ## How to check it yourself
 
-- `cd backend && pytest -q`: the whole suite, including A1–A5 (no network needed).
+- `cd backend && pytest -q`: the whole suite, including A1–A6 (no network needed).
+- `cd backend && python -m scripts.plaid_check`: the live Plaid sandbox feed, as a dry run.
 - `GET /audit/verify` or the "Verify chain" button on `/audit`.
 - `python -m app.sandbox.evidence_export --check-file evidence/<file>.jsonl --anchor evidence/anchor.json`
   recomputes the committed chain without a database (the committed export is from the local stack).
