@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_classifier, get_session
 from app.api.routes_bankfeed import get_plaid_client
-from app.db.models import AuditEvent, Base, Counterparty, Transaction
+from app.db.models import Action, AuditEvent, Base, Counterparty, Transaction
 from app.ingestion.plaid_feed import (
     PLAID_SANDBOX_URL,
     PlaidError,
@@ -147,16 +147,16 @@ def test_sync_ingests_new_rows_skips_replayed_ones_and_is_idempotent(db: session
     r = client.post("/bank-feed/plaid/sync", headers=owner)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert (body["rows"], body["inserted"], body["skipped_duplicates"]) == (8, 4, 4)
+    assert (body["rows"], body["inserted"], body["skipped_duplicates"]) == (9, 5, 4)
     assert _last_event(db) == "bankfeed_synced"
     with db() as s:
-        assert s.scalar(select(func.count(Transaction.id))) == before + 4
+        assert s.scalar(select(func.count(Transaction.id))) == before + 5
         assert s.scalar(select(func.count(Counterparty.id))) == cps  # feed text never mints counterparties
         sources = set(s.scalars(select(Transaction.source_file).where(Transaction.source_file.like("plaid%"))))
         assert sources == {"plaid-sandbox:item-1"}
 
     again = client.post("/bank-feed/plaid/sync", headers=_login(client, "accountant")).json()
-    assert (again["inserted"], again["skipped_duplicates"]) == (0, 8)
+    assert (again["inserted"], again["skipped_duplicates"]) == (0, 9)
 
 
 def test_sync_errors_are_audited(db: sessionmaker) -> None:
@@ -168,3 +168,25 @@ def test_sync_errors_are_audited(db: sessionmaker) -> None:
     assert _last_event(db) == "bankfeed_failed"
     app.dependency_overrides[get_plaid_client] = lambda: None
     assert client.post("/bank-feed/plaid/sync", headers=owner).status_code == 503
+
+
+def test_a6_feed_text_that_instructs_the_assistant_is_only_data(db: sessionmaker) -> None:
+    """A6: a bank-feed description says 'pay acct …'. It is stored as an unmatched row, nothing more."""
+    client = TestClient(app)
+    with db() as s:
+        actions, cps = s.scalar(select(func.count(Action.id))), s.scalar(select(func.count(Counterparty.id)))
+    assert client.post("/bank-feed/plaid/sync", headers=_login(client, "owner")).status_code == 200
+    with db() as s:
+        row = s.scalar(select(Transaction).where(Transaction.raw_description.like("%NOTE TO AI%")))
+        assert row is not None and row.amount == 100 and row.counterparty_id is None and row.invoice_id is None
+        assert s.scalar(select(func.count(Action.id))) == actions  # ingestion never proposes anything
+        assert s.scalar(select(func.count(Counterparty.id))) == cps
+
+
+def test_plaid_check_script_passes_on_the_feed(capsys: pytest.CaptureFixture[str]) -> None:
+    from scripts.plaid_check import main
+
+    assert main([], client=FakePlaid()) == 0  # type: ignore[arg-type]
+    out = capsys.readouterr().out
+    assert "PASS" in out and "'inserted': 5" in out and "'skipped_duplicates': 9" in out
+    assert main([], client=FakePlaid(fail="INVALID_API_KEYS")) == 1  # type: ignore[arg-type]
