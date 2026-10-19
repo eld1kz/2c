@@ -16,7 +16,7 @@ Every feature must feed one of these rows. If it doesn't, it's out.
 |---|---|
 | Task completion (40%) | Golden demo: agent finds and fixes 4 planted problems end to end |
 | Security & compliance (30%) | Policy gate, permission tiers, hash-chained audit log, PII masking, injection defense, RBAC |
-| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) |
+| Innovation & interaction (30%) | What-if simulator, evidence-cited answers, weekly CFO memo, Paperwork Center (month close + bank-ready pack), approvals inbox (mobile) with an "If you approve" 13-week impact preview, Trust & guardrails page |
 | Execution evidence | Sandbox bank writes its own logs; export script produces JSONL evidence (committed export from the local stack) |
 | Test cases | Golden dataset + adversarial tests (same scenarios as the demo) |
 | Security self-assessment | `docs/threat-model.md`, grown alongside the code |
@@ -47,6 +47,7 @@ data in → engine understands → agent finds problems & opportunities → prop
 - RBAC: owner / accountant / viewer
 - Paperwork Center (Phase 6b): cash-basis month-close reports and a printable bank-ready pack (§6.8). No balance sheet, no tax filing
 - Today home screen (Phase 6c): up to 3 decisions with one-tap prepared actions, safe to spend this week, where last month's money went (§6.9)
+- Phase 9 (no model calls): approval impact preview (a proposed reminder or terms request shows the engine's 13-week what-if: lowest week, weeks below the cushion, week-13 change; `engine/impact.py`, `services/action_impact.py`) and a read-only Trust & guardrails page (`GET /trust`, every role: tool tiers and role permissions computed from the gate's tables, Policy limits, agent limits, audit-log counts of proposals/approvals/denials/refusals/citation failures, the last 5 gate denials, chain status)
 
 ### Explicitly OUT of scope — do not build
 Real bank connections (the Plaid feed is sandbox-only), real money, tax filing, payroll, multi-company, Telegram/WeChat/other messengers, PDF OCR (stretch only), mobile native app, multi-language UI.
@@ -293,7 +294,8 @@ Fictional vendor names only (no real brands).
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button
 - `/chat` — agent chat; evidence chips; what-if results render as before/after chart
-- `/approvals` — mobile-first inbox: action, why, evidence, impact, Approve/Reject
+- `/approvals` — mobile-first inbox: action, why, evidence, impact, Approve/Reject; a proposed reminder or terms request shows "If you approve: your next 13 weeks" from the engine (Phase 9)
+- `/trust` — Trust & guardrails (Phase 9): what the assistant can and cannot do, hard limits, guardrail activity from the audit log, chain status. Every role reads; no model
 - `/audit` — event list + "Verify chain" button
 - `/upload` — CSV upload with preview
 - `/memo` — weekly CFO memo: written on demand by the agent from engine facts (`draft_cfo_memo` only), every figure cited; only a fully cited memo is cached (viewing never calls the model), a notice shows when the facts changed since; owner/accountant write it, every role reads it; demo reset clears it

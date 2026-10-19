@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.models import Action, Business, Invoice
 from app.policy.limits import OPEN_STATUSES, invoice_outstanding
 from app.sandbox import records
-from app.services import action_names, ledger
+from app.services import action_impact, action_names, ledger
 
 def _ref(session: Session, business_id: int, kind: str, id_: Any) -> dict[str, Any] | None:
     if not isinstance(id_, int):
@@ -76,6 +76,7 @@ def display(session: Session, action: Action, today: Any) -> dict[str, Any]:
         case "submit_loan_application":
             out["amount_cents"] = params.get("amount") if isinstance(params.get("amount"), int) else None
     out["sandbox"] = _sandbox(session, action, name)
+    out["impact"] = action_impact.impact(session, action, today)
     return out
 
 

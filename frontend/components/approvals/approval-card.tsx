@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { EvidenceChip, EvidenceList } from "@/components/evidence/evidence-chip";
+import { Help } from "@/components/glossary/help";
 import { Money } from "@/components/money";
 import { Button } from "@/components/ui/button";
 import { ApiError, type Schemas } from "@/lib/api/client";
@@ -45,6 +46,36 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
     <div className="flex items-baseline justify-between gap-4 py-1.5">
       <dt className="shrink-0 text-xs text-ink-3">{label}</dt>
       <dd className="num text-right text-sm text-ink">{children}</dd>
+    </div>
+  );
+}
+
+/** "If you approve": the engine's 13-week what-if of this action (a reminder → paid today; terms → paid 30 days later). */
+function ImpactPreview({ impact, currency }: { impact: NonNullable<Action["display"]>["impact"]; currency: string }) {
+  if (!impact) return null;
+  const tone = (cents: number) => (cents < impact.min_cash_buffer ? "risk" : "good");
+  return (
+    <div className="mt-4 rounded-lg border border-line px-3 py-2.5" data-testid="impact-preview">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-ink-2">
+        If you approve: your next 13 weeks <Help term="cushion" />
+      </p>
+      <dl className="mt-1 divide-y divide-line">
+        <Detail label="Lowest week">
+          <Money cents={impact.lowest_before} currency={currency} tone={tone(impact.lowest_before)} /> →{" "}
+          <Money cents={impact.lowest_after} currency={currency} tone={tone(impact.lowest_after)} className="font-semibold" />
+          <span className="text-xs text-ink-3"> ({formatDate(impact.lowest_after_week)})</span>
+        </Detail>
+        <Detail label="Weeks below your cushion">
+          {impact.weeks_below_before} → <span className="font-semibold">{impact.weeks_below_after}</span>
+        </Detail>
+        <Detail label="Cash in week 13">
+          <Money cents={impact.closing_delta} currency={currency} signed tone={impact.closing_delta >= 0 ? "good" : "risk"} />
+        </Detail>
+      </dl>
+      <p className="mt-1 text-xs text-ink-3">
+        {impact.first_below_after ? `Still below your cushion from ${formatDate(impact.first_below_after)}.` : "No week below your cushion."}{" "}
+        From the forecast engine, assuming it succeeds.
+      </p>
     </div>
   );
 }
@@ -114,6 +145,8 @@ export function ApprovalCard({ action, onDecided }: { action: Action; onDecided?
           {d?.scheduled_date && <Detail label="Payment date">{formatDate(d.scheduled_date)}</Detail>}
           {GOES_TO[action.tool] && <Detail label="Goes to">{GOES_TO[action.tool]}</Detail>}
         </dl>
+
+        {waiting && d?.impact && <ImpactPreview impact={d.impact} currency={d.currency} />}
 
         {d?.email && (
           <div className="mt-4 rounded-lg border border-line">
