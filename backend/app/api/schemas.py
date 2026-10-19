@@ -588,6 +588,27 @@ class FutureOut(BaseModel):
     pending: list[FutureFixOut]
 
 
+class TeamMemberOut(BaseModel):
+    name: str
+    role: str
+    initials: str
+    weekly_pay_cents: int | None  # None for a viewer: pay is for the owner and accountant only
+
+
+class TeamOut(BaseModel):
+    """A fixed, labelled breakdown of the payroll series (SPEC §6.9); not a staff data model."""
+    people: list[TeamMemberOut]
+    weekly_total_cents: int | None  # None for a viewer
+    payroll: EvidenceRef | None  # the recurring payroll series this breaks down
+    matches_payroll: bool
+    pay_visible: bool
+
+
+class TeamSummaryOut(BaseModel):
+    people: int
+    weekly_total_cents: int | None  # None for a viewer
+
+
 class TodayOut(BaseModel):
     as_of: date
     currency: str
@@ -596,6 +617,7 @@ class TodayOut(BaseModel):
     safe_to_spend: SafeToSpendOut
     spending: SpendingOut
     future: FutureOut
+    team: TeamSummaryOut
 
 
 class AffordAskIn(BaseModel):

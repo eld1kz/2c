@@ -145,6 +145,12 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - `backend/tests/test_today.py`: the chart starts on the base forecast and its ghost line equals the "with fixes" world; each approved fix lifts the curve (INV-1042 +$4,800 every week, then both fixes → no week below the cushion); a reset restores the base curve; headline wording; `GET /today` sends it to every role.
 - `frontend/e2e/today.spec.ts`: chart, ghost line and headline; after an approval the headline and bars change once the sheet closes; no transition with reduced motion.
 
+**6c-4 (Oct 20, last feature before the freeze): Team page.** Team roster is a fixed, labelled breakdown of the payroll series for display and what-if prompts; not a staff data model. A fixed roster in `seed/golden/team.json` (no table, no migration) summing exactly to the payroll series; `GET /team` with pay left out for viewers; "+ Hire someone" and "Give a raise" open "Can I afford it?" with both verdicts; Team under More; "Your team: 5 people, $4,343.55/week" on Today.
+
+**Acceptance (6c-4)**
+- `backend/tests/test_team.py`: weekly pay sums exactly to the Paystream series; owner/accountant see pay; viewer responses contain no pay figure (`/team` and `/today`).
+- `frontend/e2e/team.spec.ts`: list, Today line, raise and hire questions with both verdict lines, viewer sees no pay or buttons, Team under More.
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 
 **Oct 19: deployment skipped for the submission.** The product runs locally: Postgres in Docker Compose, with the API and the web app on the host (README → Run it locally; checked from a fresh clone and an empty database). The production stack (`deploy/`, `scripts/deploy.sh`, `scripts/check_deploy.sh`, `scripts/fetch_evidence.sh`, the cron reset) stays in the repository, tested and ready to deploy. The committed evidence export comes from the local stack: live P1 (ends with a reset), then live P4 with `KEEP_STATE=1`, then `evidence_export`, `--verify-anchor` and `--check-file` (README → Execution evidence).

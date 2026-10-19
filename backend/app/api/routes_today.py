@@ -19,6 +19,7 @@ from app.api.schemas import (
     FutureFixOut,
     FutureOut,
     FutureWeekOut,
+    TeamSummaryOut,
     SafeToSpendOut,
     SpendingOut,
     TodayDecisionOut,
@@ -30,7 +31,9 @@ from app.engine import statements as st
 from app.engine.forecast import project
 from app.engine.snapshot import load_snapshot
 from app.engine.today import outlook, safe_to_spend, spending
+from app.api.routes_team import pay_visible
 from app.services import ledger, today
+from app.services.team import team
 from app.services.action_service import ActionService, utc_now
 
 router = APIRouter(prefix="/today", tags=["today"])
@@ -59,6 +62,7 @@ def get_today(user: User = Depends(current_user), session: Session = Depends(get
             evidence=[ev(r) for r in d.evidence_ids[:6]], pending_action_id=pending.id if pending else None,
             sent_action_id=sent.id if sent else None)
 
+    crew = team(snap)
     ahead = today.future(session, user.business_id, day, utc_now())
     now_view, then = outlook(ahead.applied), outlook(ahead.pending) if ahead.pending else None
     pending_weeks = ahead.pending.weeks if ahead.pending else [None] * len(ahead.applied.weeks)
@@ -76,6 +80,7 @@ def get_today(user: User = Depends(current_user), session: Session = Depends(get
 
     return TodayOut(
         as_of=day, currency=snap.currency, name=user.name, future=future,
+        team=TeamSummaryOut(people=len(crew.members), weekly_total_cents=crew.weekly_total if pay_visible(user) else None),
         decisions=[out(d) for d in decisions],
         safe_to_spend=SafeToSpendOut(
             cash_cents=safe.cash, cushion_cents=safe.cushion, bills_total_cents=safe.bills_total,

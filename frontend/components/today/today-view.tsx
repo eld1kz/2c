@@ -4,7 +4,9 @@ import { useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useToday } from "@/lib/api/hooks";
-import { formatDate } from "@/lib/money";
+import Link from "next/link";
+
+import { formatCents, formatDate } from "@/lib/money";
 
 import { AffordBox } from "./afford-box";
 import { DecisionCard } from "./decision-card";
@@ -27,6 +29,9 @@ export function TodayView() {
         <p className="mt-1 text-[15px] text-ink-2">
           {data.decisions.length ? `${data.decisions.length === 1 ? "One decision" : `${data.decisions.length} decisions`} worth your time today.` : "Nothing needs a decision today."}
         </p>
+        <Link href="/team" className="mt-1 inline-block text-sm text-brand-ink hover:underline" data-testid="team-line">
+          Your team: {data.team.people} people{data.team.weekly_total_cents !== null && data.team.weekly_total_cents !== undefined ? `, ${formatCents(data.team.weekly_total_cents, data.currency)}/week` : ""}
+        </Link>
       </div>
       <FutureChart future={data.future} currency={data.currency} hold={sheetOpen} />
       <section className="space-y-3" aria-label="Decisions">

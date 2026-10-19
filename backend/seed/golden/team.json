@@ -1,0 +1,11 @@
+{
+  "note": "Fixed, labelled breakdown of the Paystream Payroll weekly series for display and what-if prompts; not a staff data model. Fictional people. Weekly pay sums exactly to the series amount (tests/test_team.py).",
+  "payroll_counterparty": "Paystream Payroll",
+  "people": [
+    {"name": "Maya Okafor", "role": "Head roaster", "weekly_pay_cents": 115000},
+    {"name": "Daniel Reyes", "role": "Roaster", "weekly_pay_cents": 90500},
+    {"name": "Priya Nair", "role": "Barista lead", "weekly_pay_cents": 86000},
+    {"name": "Tom Lindqvist", "role": "Barista", "weekly_pay_cents": 74200},
+    {"name": "Aiko Tanaka", "role": "Packing and shipping", "weekly_pay_cents": 68655}
+  ]
+}

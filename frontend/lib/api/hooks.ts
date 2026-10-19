@@ -69,6 +69,9 @@ export function useGenerateMemo() {
   });
 }
 
+export const useTeam = () =>
+  useQuery({ queryKey: ["team"], queryFn: async () => unwrap(await api.GET("/team")) });
+
 export const useToday = () =>
   useQuery({ queryKey: keys.today, queryFn: async () => unwrap(await api.GET("/today")) });
 

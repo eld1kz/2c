@@ -465,6 +465,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Team */
+        get: operations["get_team_team_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1462,6 +1479,39 @@ export interface components {
             /** Evidence */
             evidence: components["schemas"]["EvidenceRef"][];
         };
+        /** TeamMemberOut */
+        TeamMemberOut: {
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Initials */
+            initials: string;
+            /** Weekly Pay Cents */
+            weekly_pay_cents: number | null;
+        };
+        /**
+         * TeamOut
+         * @description A fixed, labelled breakdown of the payroll series (SPEC §6.9); not a staff data model.
+         */
+        TeamOut: {
+            /** People */
+            people: components["schemas"]["TeamMemberOut"][];
+            /** Weekly Total Cents */
+            weekly_total_cents: number | null;
+            payroll: components["schemas"]["EvidenceRef"] | null;
+            /** Matches Payroll */
+            matches_payroll: boolean;
+            /** Pay Visible */
+            pay_visible: boolean;
+        };
+        /** TeamSummaryOut */
+        TeamSummaryOut: {
+            /** People */
+            people: number;
+            /** Weekly Total Cents */
+            weekly_total_cents: number | null;
+        };
         /** TodayDecisionOut */
         TodayDecisionOut: {
             insight: components["schemas"]["EvidenceRef"];
@@ -1500,6 +1550,7 @@ export interface components {
             safe_to_spend: components["schemas"]["SafeToSpendOut"];
             spending: components["schemas"]["SpendingOut"];
             future: components["schemas"]["FutureOut"];
+            team: components["schemas"]["TeamSummaryOut"];
         };
         /** TokenOut */
         TokenOut: {
@@ -2454,6 +2505,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_team_team_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
                 };
             };
         };

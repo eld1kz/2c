@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Answer } from "@/components/chat/answer";
 import { WhatIfPanel } from "@/components/whatif/whatif-panel";
@@ -66,14 +66,23 @@ function Verdicts({ r }: { r: Afford }) {
 }
 
 /** One question → the agent maps it to a what-if → the engine's verdict, a cited sentence and a chart. */
-export function AffordBox() {
-  const [question, setQuestion] = useState("");
+export function AffordBox({ initialQuestion = "" }: { initialQuestion?: string }) {
+  const [question, setQuestion] = useState(initialQuestion);
   const ask = useAfford();
   const r = ask.data;
+  const asked = useRef(false);
 
   function submit(q: string) {
     if (q.trim().length >= 3 && !ask.isPending) ask.mutate(q.trim());
   }
+
+  // opened prefilled (Team: hire or raise): ask once, as if the owner had pressed Check
+  useEffect(() => {
+    if (initialQuestion && !asked.current) {
+      asked.current = true;
+      ask.mutate(initialQuestion);
+    }
+  }, [initialQuestion, ask]);
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5" aria-labelledby="afford-title">
