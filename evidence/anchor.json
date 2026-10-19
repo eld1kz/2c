@@ -1,0 +1,10 @@
+{
+  "format": "ledgerwise-evidence/1",
+  "exported_at": "2026-10-19T08:18:46.888471Z",
+  "head_seq": 1690,
+  "head_hash": "bd934b030e48d8d7605ddf41c8223b39a9b1e16994de628d965cec5d41d4d473",
+  "events": 1690,
+  "export_file": "ledgerwise-evidence-20261019T081846Z.jsonl",
+  "export_sha256": "0c47c934f450fb4805ff93cb22bad9f594398e99c8766fa73ae997cbbb22317f",
+  "chain_verified_in_db": true
+}

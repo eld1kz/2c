@@ -4,7 +4,7 @@ import { signIn, watchConsole } from "./helpers";
 
 // P4 end to end with the real assistant (spends AI budget). Starts from the golden state (run
 // `python -m seed.reset` first if needed) and ends by pressing "Reset demo data", so it can be repeated.
-// Run with LIVE=1, desktop only.
+// Run with LIVE=1, desktop only. KEEP_STATE=1 stops before the reset (for the evidence export).
 test.skip(!process.env.LIVE, "set LIVE=1 to call the real assistant");
 
 const shot = (page: Page, name: string) => page.screenshot({ path: `e2e/.results/p4-${name}.png`, fullPage: true });
@@ -87,6 +87,11 @@ test("live P4: cash gap → what-if → leftover financing → reminder + terms 
   await page.getByRole("button", { name: "Verify chain" }).click();
   await expect(page.getByRole("region", { name: "Tamper check" }).getByRole("status")).toContainText("Chain intact.");
   await shot(page, "7-audit");
+  if (process.env.KEEP_STATE) {
+    // evidence run: keep the approved actions and sandbox emails for the export (README "Execution evidence")
+    expect(errors).toEqual([]);
+    return;
+  }
 
   // 6. reset: back to the golden state, audit log kept and still verifying
   await page.getByRole("button", { name: "Reset demo data" }).first().click();
