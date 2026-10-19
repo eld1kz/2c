@@ -3,6 +3,7 @@ import { FlaskConicalIcon } from "lucide-react";
 import { EvidenceChip } from "@/components/evidence/evidence-chip";
 import type { Schemas } from "@/lib/api/client";
 import { formatCents, formatDate } from "@/lib/money";
+import { Help } from "@/components/glossary/help";
 
 type Assumption = Schemas["AssumptionOut"];
 
@@ -69,6 +70,7 @@ export function Assumptions({ items, currency }: { items: Assumption[]; currency
       <h2 id="assumptions-title" className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-attn-ink uppercase">
         <FlaskConicalIcon className="size-3.5" /> Assumption, not a recorded fact
       </h2>
+      <div className="mt-1"><Help term="assumption" /></div>
       <ul className="mt-2 space-y-1.5 text-[15px] leading-relaxed text-ink">
         {items.map((a, i) => (
           <li key={i}>

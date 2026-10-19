@@ -11,6 +11,8 @@ import { cn } from "@/lib/cn";
 import { weekList } from "@/lib/labels";
 import { formatCents } from "@/lib/money";
 import type { ScenarioInput } from "@/lib/scenarios";
+import { Help } from "@/components/glossary/help";
+import type { TermId } from "@/lib/glossary";
 
 type Option = Schemas["FinancingOptionOut"];
 
@@ -27,13 +29,21 @@ function Coverage({ o, gap, currency }: { o: Option; gap: number; currency: stri
   );
 }
 
+const OPTION_TERM: Record<string, TermId> = {
+  overdraft: "apr", short_term_loan: "apr", invoice_factoring: "factoring",
+  supplier_terms_extension: "payment_terms", accelerate_receivables: "receivable",
+};
+
 function OptionCard({ o, gap, currency }: { o: Option; gap: number; currency: string }) {
   return (
     <li className={cn("rounded-[var(--radius-panel)] border bg-surface p-4", o.rank === 1 ? "border-brand/50" : "border-line")} aria-label={`Option ${o.rank}: ${o.name}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-ink-3">{o.rank === 1 ? "Rank 1 · cheapest full cover" : `Rank ${o.rank}`}</p>
-          <h3 className="mt-0.5 text-[15px] leading-snug font-semibold text-ink">{o.name}</h3>
+          <div className="mt-0.5 flex items-start gap-1">
+            <h3 className="text-[15px] leading-snug font-semibold text-ink">{o.name}</h3>
+            {OPTION_TERM[o.option_id] && <Help term={OPTION_TERM[o.option_id]} />}
+          </div>
         </div>
         <p className="shrink-0 text-right">
           <span className="num block text-lg font-semibold text-ink">{formatCents(o.cost_cents, currency)}</span>

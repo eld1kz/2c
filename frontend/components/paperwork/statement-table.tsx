@@ -1,3 +1,4 @@
+import { Help } from "@/components/glossary/help";
 import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/money";
 import type { StatementRow } from "@/lib/statements";
@@ -39,6 +40,7 @@ export function StatementTable({ columns, rows, currency, label }: { columns: st
                 )}
               >
                 {row.label}
+                {row.term && <> <Help term={row.term} /></>}
               </th>
               {row.values.map((v, j) => (
                 <td key={j} className={cn("px-4 py-1.5 text-right whitespace-nowrap md:px-2", row.kind ? "font-semibold text-ink" : "text-ink-2")}>

@@ -11,6 +11,7 @@ import { useAfford } from "@/lib/api/hooks";
 import type { components } from "@/lib/api/schema";
 import { formatDay } from "@/lib/money";
 import type { ScenarioInput } from "@/lib/scenarios";
+import { Help } from "@/components/glossary/help";
 
 const EXAMPLES = ["Hire a barista at $2,500/month from November?", "Give staff a 3% raise?", "Buy a $3,000 espresso machine?"];
 
@@ -58,7 +59,7 @@ function Verdicts({ r }: { r: Afford }) {
         )}
       </ul>
       <p className="text-xs text-ink-3">
-        From your 13-week forecast. Safe means no week ends below your cushion.
+        From your 13-week forecast <Help term="forecast" />. Safe means no week ends below your cushion <Help term="cushion" />.
         {fixed && " The second line assumes the actions prepared on Today work out; nothing is sent until you approve it."}
       </p>
     </div>

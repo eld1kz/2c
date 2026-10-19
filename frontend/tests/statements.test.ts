@@ -25,7 +25,7 @@ describe("pnlRows", () => {
 
   it("copies totals from the API and shows Other income only when there is some", () => {
     const rows = pnlRows([pnl("Sep", [line("rent", 600)])]);
-    expect(rows.at(-1)).toEqual({ label: "Net profit (cash basis)", values: [400], kind: "grand" });
+    expect(rows.at(-1)).toEqual({ label: "Net profit (cash basis)", values: [400], kind: "grand", term: "net_profit" });
     expect(rows.some((r) => r.label === "Other income")).toBe(false);
     expect(pnlRows([pnl("Sep", [], [line("other", 50)])]).some((r) => r.label === "Other income")).toBe(true);
   });

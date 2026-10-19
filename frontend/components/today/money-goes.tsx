@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Money } from "@/components/money";
 import type { Schemas } from "@/lib/api/client";
 import { lineLabel } from "@/lib/statements";
+import { Help } from "@/components/glossary/help";
 
 const SHOWN = 5;
 
@@ -13,7 +14,10 @@ export function MoneyGoes({ spending, currency }: { spending: Schemas["SpendingO
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5" aria-labelledby="goes-title">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="goes-title" className="text-[15px] font-semibold">Where your money went in {spending.period.label.split(" ")[0]}</h2>
+        <div className="flex items-center gap-1">
+          <h2 id="goes-title" className="text-[15px] font-semibold">Where your money went in {spending.period.label.split(" ")[0]}</h2>
+          <Help term="profit_and_loss" />
+        </div>
         <Money cents={spending.total_cents} currency={currency} className="text-[17px] font-semibold" split />
       </div>
       <Link href="/paperwork" className="mt-3 block space-y-2.5 rounded-lg outline-offset-4" aria-label="Open the full profit and loss">

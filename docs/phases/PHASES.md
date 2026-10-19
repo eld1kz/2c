@@ -151,6 +151,8 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - `backend/tests/test_team.py`: weekly pay sums exactly to the Paystream series; owner/accountant see pay; viewer responses contain no pay figure (`/team` and `/today`).
 - `frontend/e2e/team.spec.ts`: list, Today line, raise and hire questions with both verdict lines, viewer sees no pay or buttons, Team under More.
 
+**6c-5 (Oct 20, frontend-only polish, then freeze):** a design pass on Login, Today and Team (serif display face, the forecast chart as the hero, money with raised cents, a one-time "Sent" check after an approval; colour meanings unchanged), and a beginner glossary: "What is this?" popovers on 24 terms across Today, Team, What-if and Paperwork (`tests/glossary.test.ts`: every term used exists, every entry is used, one or two sentences each; `e2e/glossary.spec.ts`).
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 
 **Oct 19: deployment skipped for the submission.** The product runs locally: Postgres in Docker Compose, with the API and the web app on the host (README → Run it locally; checked from a fresh clone and an empty database). The production stack (`deploy/`, `scripts/deploy.sh`, `scripts/check_deploy.sh`, `scripts/fetch_evidence.sh`, the cron reset) stays in the repository, tested and ready to deploy. The committed evidence export comes from the local stack: live P1 (ends with a reset), then live P4 with `KEEP_STATE=1`, then `evidence_export`, `--verify-anchor` and `--check-file` (README → Execution evidence).

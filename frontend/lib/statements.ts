@@ -1,10 +1,11 @@
 import type { Schemas } from "@/lib/api/client";
 import { CATEGORIES, CATEGORY } from "@/lib/labels";
+import type { TermId } from "@/lib/glossary";
 
 // Rows for the cash-basis statement tables. Every figure is copied from the API (integer cents);
 // nothing here adds or subtracts. A statement with several periods gets one column per period.
 
-export type StatementRow = { label: string; values: (number | null)[]; kind?: "section" | "total" | "grand" };
+export type StatementRow = { label: string; values: (number | null)[]; kind?: "section" | "total" | "grand"; term?: TermId };
 
 type Pnl = Schemas["ProfitAndLossOut"];
 type Section = "revenue" | "cogs" | "operating_expenses" | "other_income";
@@ -32,14 +33,14 @@ export function pnlRows(pnls: Pnl[]): StatementRow[] {
   });
   const otherIncome = pnls.some((p) => p.other_income.length > 0);
   return [
-    { label: "Income", values: pnls.map(() => null), kind: "section" },
+    { label: "Income", values: pnls.map(() => null), kind: "section", term: "revenue" },
     ...sectionRows(pnls, "revenue"),
     total("Total income", (p) => p.total_revenue_cents),
-    { label: "Cost of goods sold", values: pnls.map(() => null), kind: "section" },
+    { label: "Cost of goods sold", values: pnls.map(() => null), kind: "section", term: "cogs" },
     ...sectionRows(pnls, "cogs"),
     total("Total cost of goods sold", (p) => p.total_cogs_cents),
     total("Gross profit", (p) => p.gross_profit_cents),
-    { label: "Operating expenses", values: pnls.map(() => null), kind: "section" },
+    { label: "Operating expenses", values: pnls.map(() => null), kind: "section", term: "operating_expenses" },
     ...sectionRows(pnls, "operating_expenses"),
     total("Total operating expenses", (p) => p.total_operating_expenses_cents),
     ...(otherIncome
@@ -49,7 +50,7 @@ export function pnlRows(pnls: Pnl[]): StatementRow[] {
           total("Total other income", (p) => p.total_other_income_cents),
         ]
       : []),
-    total("Net profit (cash basis)", (p) => p.net_profit_cents, "grand"),
+    { ...total("Net profit (cash basis)", (p) => p.net_profit_cents, "grand"), term: "net_profit" },
   ];
 }
 

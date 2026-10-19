@@ -9,6 +9,7 @@ import { AffordBox } from "@/components/today/afford-box";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useTeam } from "@/lib/api/hooks";
+import { Help } from "@/components/glossary/help";
 
 const input = "h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm outline-none focus:border-brand";
 
@@ -55,6 +56,7 @@ export function TeamView() {
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-3">
           <span>A breakdown of your payroll payments{data.pay_visible ? "" : " (pay is visible to the owner and accountant)"}.</span>
+          <Help term="payroll" />
           {data.payroll && <EvidenceChip evidence={data.payroll} />}
         </div>
         {!data.matches_payroll && data.pay_visible && (

@@ -20,20 +20,20 @@ export function MonthCloseView() {
     <div className="space-y-5">
       <Disclaimer disclaimer={data.disclaimer} basis={data.basis} />
       <div className="grid gap-5 lg:grid-cols-2">
-        <Panel id="rec-title" title="Bank reconciliation" subtitle={`${period.label}: your books against the bank statement`}>
+        <Panel id="rec-title" term="bank_reconciliation" title="Bank reconciliation" subtitle={`${period.label}: your books against the bank statement`}>
           <ReconciliationTable rec={data.reconciliation} currency={currency} />
         </Panel>
-        <Panel id="cf-title" title="Cash-flow statement" subtitle={`${period.label}: where the cash came from and went`}>
+        <Panel id="cf-title" term="cash_flow_statement" title="Cash-flow statement" subtitle={`${period.label}: where the cash came from and went`}>
           <StatementTable columns={[period.label]} rows={cashFlowRows([data.cash_flow])} currency={currency} label="Cash-flow statement" />
         </Panel>
       </div>
-      <Panel id="pnl-title" title="Profit and loss" subtitle={`${period.label}, cash basis, ${data.profit_and_loss.transaction_count} transactions`}>
+      <Panel id="pnl-title" term="profit_and_loss" title="Profit and loss" subtitle={`${period.label}, cash basis, ${data.profit_and_loss.transaction_count} transactions`}>
         <StatementTable columns={[period.label]} rows={pnlRows([data.profit_and_loss])} currency={currency} label="Profit and loss" />
       </Panel>
-      <Panel id="ar-title" title="Money customers owe you" subtitle="Receivables aging: open invoices by how late they are">
+      <Panel id="ar-title" term="receivable" title="Money customers owe you" subtitle="Receivables aging: open invoices by how late they are">
         <AgingTable aging={data.receivables} currency={currency} label="Receivables" />
       </Panel>
-      <Panel id="ap-title" title="Bills you owe" subtitle="Payables aging: open supplier bills by how late they are">
+      <Panel id="ap-title" term="payable" title="Bills you owe" subtitle="Payables aging: open supplier bills by how late they are">
         <AgingTable aging={data.payables} currency={currency} label="Payables" />
       </Panel>
     </div>

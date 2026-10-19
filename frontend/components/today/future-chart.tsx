@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { Schemas } from "@/lib/api/client";
 import { formatDay, formatCents } from "@/lib/money";
+import { Help } from "@/components/glossary/help";
 
 type Future = Schemas["FutureOut"];
 type Fix = Schemas["FutureFixOut"];
@@ -79,19 +80,19 @@ export function FutureChart({ future, currency, hold }: { future: Future; curren
 
       <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-[13px] text-ink-2">
         <li className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-good" /> Above your cushion</span>
+          <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-good" /> Above your cushion <Help term="cushion" /></span>
           <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-risk" /> Below it</span>
-          <span className="text-ink-3">Weekly closing cash for your next 13 weeks</span>
+          <span className="flex items-center gap-1 text-ink-3">Weekly closing cash for your next 13 weeks <Help term="closing_cash" /></span>
         </li>
         {f.applied.length > 0 && <li>Includes the fixes you approved: {f.applied.map(fixText).join(", ")}.</li>}
         {f.pending.length > 0 && f.pending_headline && (
           <li className="flex items-start gap-1.5">
             <svg className="mt-1.5 h-0.5 w-4 shrink-0" aria-hidden><line x1="0" y1="1" x2="16" y2="1" stroke="var(--color-brand)" strokeWidth={2} strokeDasharray="4 3" /></svg>
-            <span>Pending fixes ({f.pending.map(fixText).join(", ")}): {f.pending_headline}</span>
+            <span>Pending fixes <Help term="what_if" /> ({f.pending.map(fixText).join(", ")}): {f.pending_headline}</span>
           </li>
         )}
       </ul>
-      <p className="mt-2 text-[11px] text-ink-3">From your forecast, assuming approved fixes work out. Nothing is sent until you approve it.</p>
+      <p className="mt-2 flex items-center gap-1 text-[11px] text-ink-3">From your forecast, assuming approved fixes work out. Nothing is sent until you approve it. <Help term="forecast" /></p>
     </section>
   );
 }

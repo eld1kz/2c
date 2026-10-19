@@ -7,6 +7,7 @@ import { EvidenceChip } from "@/components/evidence/evidence-chip";
 import { Money } from "@/components/money";
 import type { Schemas } from "@/lib/api/client";
 import { formatCents, formatDay } from "@/lib/money";
+import { Help } from "@/components/glossary/help";
 
 /** "You can safely spend $X this week": cash − your cushion − bills due in 7 days, from the engine. */
 export function SafeToSpend({ safe, currency }: { safe: Schemas["SafeToSpendOut"]; currency: string }) {
@@ -36,19 +37,19 @@ export function SafeToSpend({ safe, currency }: { safe: Schemas["SafeToSpendOut"
             <dd><Money cents={safe.cash_cents} currency={currency} /></dd>
           </div>
           <div className="flex justify-between gap-3 py-2">
-            <dt>Your cushion (money you keep for surprises)</dt>
+            <dt className="flex items-center gap-1">Your cushion (money you keep for surprises) <Help term="cushion" /></dt>
             <dd><Money cents={-safe.cushion_cents} currency={currency} /></dd>
           </div>
           {safe.bills.map((b) => (
             <div key={`${b.source.ref}-${b.date}`} className="flex items-center justify-between gap-3 py-2">
               <dt className="flex flex-wrap items-center gap-1.5 text-ink-2">
-                Bill on {formatDay(b.date)} <EvidenceChip evidence={b.source} />
+                Bill on {formatDay(b.date)} <EvidenceChip evidence={b.source} /> <Help term="bill" />
               </dt>
               <dd><Money cents={-b.amount_cents} currency={currency} /></dd>
             </div>
           ))}
           <div className="flex justify-between gap-3 py-2 font-semibold">
-            <dt>Safe to spend</dt>
+            <dt className="flex items-center gap-1">Safe to spend <Help term="safe_to_spend" /></dt>
             <dd><Money cents={safe.amount_cents} currency={currency} tone={nothing ? "risk" : "good"} /></dd>
           </div>
         </dl>

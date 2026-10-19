@@ -37,23 +37,24 @@ export function BankPackView() {
         </Button>
       </div>
       <Disclaimer disclaimer={data.disclaimer} basis={data.basis} />
-      <Panel id="pack-pnl" title="Profit and loss" subtitle={`Last ${data.months.length} months, cash basis`}>
+      <Panel id="pack-pnl" term="cash_basis" title="Profit and loss" subtitle={`Last ${data.months.length} months, cash basis`}>
         <StatementTable columns={columns} rows={pnlRows(data.profit_and_loss)} currency={currency} label="Profit and loss, by month" />
       </Panel>
-      <Panel id="pack-cf" title="Cash-flow statement" subtitle={`Last ${data.months.length} months`}>
+      <Panel id="pack-cf" term="cash_flow_statement" title="Cash-flow statement" subtitle={`Last ${data.months.length} months`}>
         <StatementTable columns={columns} rows={cashFlowRows(data.cash_flow)} currency={currency} label="Cash flow, by month" />
       </Panel>
-      <Panel id="pack-fc" title="13-week cash forecast" subtitle={`Weekly closing cash; minimum buffer ${formatCents(data.min_cash_buffer_cents, currency)}`}>
+      <Panel id="pack-fc" term="forecast" title="13-week cash forecast" subtitle={`Weekly closing cash; minimum buffer ${formatCents(data.min_cash_buffer_cents, currency)}`}>
         <ForecastTable weeks={data.forecast} currency={currency} onSelectWeek={(w) => evidence?.open(`forecast_week:${w}`)} />
       </Panel>
       <Panel
         id="pack-ob"
+        term="fixed_obligations"
         title="Fixed obligations"
         subtitle="Rent and lease payments from your recurring payments. Not a loan statement: no principal or interest data."
       >
         <ObligationsTable obligations={data.obligations} currency={currency} />
       </Panel>
-      <Panel id="pack-ar" title="Receivables aging" subtitle="Open customer invoices by how late they are">
+      <Panel id="pack-ar" term="aging" title="Receivables aging" subtitle="Open customer invoices by how late they are">
         <AgingTable aging={data.receivables} currency={currency} label="Receivables" />
       </Panel>
       <Panel id="pack-ni" title="Not included" subtitle="This pack is built only from your bank and invoice records. A lender may also ask for:">
