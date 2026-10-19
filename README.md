@@ -137,6 +137,19 @@ Frontend (`frontend/.env.local`): `BACKEND_URL` (where the gateway sends API cal
 `DEMO_PASSWORD` (shows the one-click demo sign-in; demo deployments only), and
 `DEMO_RESET_EVERY_HOURS` (shows the reset note on the login page).
 
+### Test data
+
+All demo data is fictional and lives in [`backend/seed/golden/`](backend/seed/golden/). Data comes in
+two ways, and both use the same import pipeline:
+
+| Source | Files | What it is | How to try it |
+|---|---|---|---|
+| **CSV bank statements** (the golden data) | `bank_checking_2026Q2.csv` (Apr–Jun), `bank_checking_2026Q3.csv` (Jul–Sep) | 306 messy bank rows for Ember & Oak Coffee Roasters, Apr 1 – Sep 30, 2026, in two different column layouts (`Date/Description/Amount/Balance` and `Posting Date/Transaction Details/Debit/Credit/Running Balance`), with P1–P4 planted. `invoices.json` (49 invoices, incl. the A1 injection note), `counterparties.json` (16), `rules.json`, `business.json`, `team.json` complete the set | Loaded by `python -m seed.load` / `seed.reset`. To see the CSV import: More → Import → drop `bank_checking_2026Q3.csv` → preview → Import → every row is skipped as already imported. Edit or add a row first to see it imported and categorized |
+| **Plaid sandbox feed** | `plaid_feed.json` | 9 transactions served back by Plaid's sandbox API: 4 new everyday rows, 4 that repeat the end of the Q3 CSV, and the A6 injection row | `cd backend && python -m scripts.plaid_check`, or More → Import → **Sync bank feed** ([below](#plaid-sandbox-bank-feed-2-minute-check)) |
+
+The CSVs and JSON are what the tests and the 5-minute tour expect; Plaid rows only enter the database
+when someone syncs, and a reset removes them.
+
 ### Plaid sandbox bank feed (2-minute check)
 
 Besides CSV upload, transactions can come from a bank API: **Plaid, sandbox only** (fake bank, fake
