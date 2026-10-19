@@ -21,6 +21,7 @@ from app.engine.forecast import Forecast, project
 from app.engine.insights.base import money
 from app.engine.insights.price_creep import price_rises
 from app.engine.snapshot import Snapshot, load_snapshot
+from app.engine.whatif import CollectReceivable, DelaySupplierPayments, Scenario, ScenarioError, run_what_if
 from app.services import ledger
 from app.services.action_service import ActionService, Forbidden, NotFound, actor_for, utc_now
 from app.services.drafts import Tone
@@ -87,6 +88,30 @@ def decisions(session: Session, business_id: int, today: date) -> list[Decision]
     snap = load_snapshot(session, business_id, today)
     forecast = project(snap)
     return [_decision(i, snap, forecast) for i in _open_insights(session, business_id)[:MAX_DECISIONS]]
+
+
+def fixes(session: Session, business_id: int, today: date) -> list[tuple[Decision, Scenario]]:
+    """What Today's decisions would do to cash if they succeed, as engine what-if scenarios: a reminder →
+    the invoice is paid today; a terms request → the supplier's upcoming invoices are paid 30 days later
+    (the email asks for that on invoices issued from today). A price email has no figure: the supplier's
+    answer is unknown. A scenario that no longer applies to the forecast is left out."""
+    forecast = project(load_snapshot(session, business_id, today))
+    out: list[tuple[Decision, Scenario]] = []
+    for d in decisions(session, business_id, today):
+        scenario: Scenario
+        match d.kind:
+            case "reminder":
+                scenario = CollectReceivable(d.target["invoice_id"], today)
+            case "terms_request":
+                scenario = DelaySupplierPayments(d.target["counterparty_id"], TERMS_EXTENSION_DAYS)
+            case _:
+                continue
+        try:
+            run_what_if(forecast, [scenario])
+        except ScenarioError:
+            continue
+        out.append((d, scenario))
+    return out
 
 
 def _targets(action: Action, target: dict[str, int]) -> bool:

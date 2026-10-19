@@ -89,7 +89,7 @@ test("navigation is Today, Ask, Approvals and More", async ({ page }, info) => {
   }
 });
 
-test("can I afford it: a chip asks, the engine verdict, a cited sentence and the chart", async ({ page }, info) => {
+test("can I afford it: a chip asks, both engine verdicts (today, with Today's fixes), a cited sentence and the chart", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
   let asked = "";
@@ -101,6 +101,11 @@ test("can I afford it: a chip asks, the engine verdict, a cited sentence and the
         message: "No: your cash already falls below your $5,000.00 cushion in Week 6 (Nov 5) [[forecast_week:6]], before any new cost.",
         citations: [{ ref: "forecast_week:6", valid: true, label: "Week 6 (Nov 5)", reason: null }],
         scenarios: [{ type: "add_recurring", amount_cents: -250_000, cadence: "monthly", start: "2026-11-01" }],
+        requested_start: "2026-11-01", short_from: "2026-11-05",
+        with_fixes: {
+          verdict: "not_yet", earliest_safe_start: "2026-12-06", short_from: null,
+          fixes: [{ kind: "terms_request", name: "Verde Green Coffee Imports", insight_id: 2 }, { kind: "reminder", name: "Harbor Lane Café", insight_id: 3 }],
+        },
       },
     });
   });
@@ -108,7 +113,9 @@ test("can I afford it: a chip asks, the engine verdict, a cited sentence and the
   await expect(box.getByRole("textbox", { name: "Can I afford it?" })).toHaveAttribute("placeholder", "Hire a barista at $2,500/month from November?");
   await box.getByRole("button", { name: "Hire a barista at $2,500/month from November?" }).click();
   const result = box.getByTestId("afford-result");
-  await expect(result.getByText("No", { exact: true })).toBeVisible();
+  const lines = result.getByRole("list", { name: "Verdicts" }).getByRole("listitem");
+  await expect(lines).toHaveText(["Today: No — already short from Nov 5",
+    "If Verde Green Coffee Imports agrees and Harbor Lane Café pays: Not yet — safe from Dec 6"]);
   await expect(result).toContainText("falls below your $5,000.00 cushion");
   await expect(result.getByRole("button", { name: "Week 6 (Nov 5)" })).toBeVisible();
   await expect(result.getByRole("region", { name: "What-if result" })).toBeVisible();

@@ -5,6 +5,7 @@ non-zero and at most $1,000,000, and every target record (invoice, recurring ser
 business. Inputs are ids, dates, enums and integer cents only: no free text.
 """
 
+from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Annotated, Literal
 
@@ -21,6 +22,7 @@ from app.engine.whatif import (
     RemoveSeries,
     Scenario,
     ScenarioError,
+    run_what_if,
 )
 from app.engine.afford import Affordability, affordability
 from app.engine.forecast import project
@@ -131,12 +133,17 @@ def check_targets(session: Session, business_id: int, currency: str, today: date
             raise ScenarioError(f"{ref} not found")
 
 
-def assess(session: Session, snap: Snapshot, today: date, item: AddRecurringIn | OneOffIn | RaisePayrollIn) -> Affordability:
-    """The engine verdict for one plan (ScenarioError on a bad date, amount or missing payroll)."""
+def assess(session: Session, snap: Snapshot, today: date, item: AddRecurringIn | OneOffIn | RaisePayrollIn,
+           fixes: Sequence[Scenario] = ()) -> Affordability:
+    """The engine verdict for one plan (ScenarioError on a bad date, amount or missing payroll), on the base
+    forecast or, with `fixes`, on the forecast where those scenarios have already happened."""
     field = "on" if isinstance(item, OneOffIn) else "start"
 
     def at(day: date) -> list[Scenario]:
         return to_scenarios([item.model_copy(update={field: day})], today, snap.series)
 
     check_targets(session, snap.business_id, snap.currency, today, at(getattr(item, field)))
-    return affordability(project(snap), at, getattr(item, field))
+    base = project(snap)
+    if fixes:
+        base = run_what_if(base, list(fixes)).scenario
+    return affordability(base, at, getattr(item, field))

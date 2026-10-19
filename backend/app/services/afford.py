@@ -5,6 +5,10 @@ raise or a one-off purchase) and phrase the answer. It runs one turn limited to 
 with the same citation and claim checks, PII masking, time limits and AI budget as chat. The verdict
 returned to the UI is recomputed here from the scenario the tool validated, never read from the text;
 an answer that doesn't open with that verdict carries a warning. Nothing is stored.
+
+A second verdict, also from the engine, answers the same plan in the world where Today's prepared
+fixes succeed (services/today.fixes: the late invoice is paid, the supplier agrees to longer terms).
+The AI sentence speaks only to today's verdict.
 """
 
 import uuid
@@ -22,6 +26,8 @@ from app.db.models import User
 from app.engine.snapshot import load_snapshot
 from app.services.action_service import utc_now
 from app.services.llm_budget import LlmBudget
+from app.engine.afford import Affordability
+from app.services import today as today_service
 from app.services.scenarios import AffordScenarioIn, assess
 
 AFFORD_TOOLS = frozenset({"check_affordability"})
@@ -54,6 +60,9 @@ class AffordAnswer:
     citations: list[dict[str, Any]]
     warnings: list[str]
     scenarios: list[dict[str, Any]]  # the checked plan, for the before/after chart
+    detail: Affordability | None = None  # today's verdict in full (requested start, first week already short)
+    with_fixes: Affordability | None = None  # the verdict if Today's fixes succeed; None when there are none
+    fixes: tuple[today_service.Decision, ...] = ()
 
 
 def ask(session: Session, user: User, model: ChatModel, today: date, question: str, budget: LlmBudget | None = None,
@@ -74,10 +83,14 @@ def ask(session: Session, user: User, model: ChatModel, today: date, question: s
         return AffordAnswer(None, None, done["message"], done["citations"],
                             [*warnings, "The question couldn't be turned into a plan to check."], [])
     plan = checked[-1][:1]
-    verdict = assess(session, load_snapshot(session, user.business_id, today), today, _adapter.validate_python(plan[0]))
+    snap, item = load_snapshot(session, user.business_id, today), _adapter.validate_python(plan[0])
+    verdict = assess(session, snap, today, item)
+    fixes = today_service.fixes(session, user.business_id, today)
+    with_fixes = assess(session, snap, today, item, [s for _, s in fixes]) if fixes else None
     word = VERDICT_WORDS[verdict.verdict]
     opening = done["message"].lstrip(" *#_>\n")
     if not opening.startswith(word) or (word == "No" and opening.startswith("Not yet")):
         warnings.append(f"The answer doesn't open with the verdict from your forecast: {word}.")
     session.commit()
-    return AffordAnswer(verdict.verdict, verdict.earliest_safe_start, done["message"], done["citations"], warnings, plan)
+    return AffordAnswer(verdict.verdict, verdict.earliest_safe_start, done["message"], done["citations"], warnings, plan,
+                        verdict, with_fixes, tuple(d for d, _ in fixes))

@@ -8,10 +8,11 @@ import { WhatIfPanel } from "@/components/whatif/whatif-panel";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
 import { useAfford } from "@/lib/api/hooks";
-import { formatDate } from "@/lib/money";
+import type { components } from "@/lib/api/schema";
+import { formatDay } from "@/lib/money";
 import type { ScenarioInput } from "@/lib/scenarios";
 
-const EXAMPLES = ["Hire a barista at $2,500/month from November?", "Give staff a 5% raise?", "Buy a $3,000 espresso machine?"];
+const EXAMPLES = ["Hire a barista at $2,500/month from November?", "Give staff a 3% raise?", "Buy a $3,000 espresso machine?"];
 
 const VERDICT: Record<string, { label: string; cls: string }> = {
   yes: { label: "Yes", cls: "bg-good-soft text-good-ink" },
@@ -19,12 +20,56 @@ const VERDICT: Record<string, { label: string; cls: string }> = {
   no: { label: "No", cls: "bg-risk-soft text-risk-ink" },
 };
 
+type Afford = components["schemas"]["AffordOut"];
+type Fix = components["schemas"]["AffordFixOut"];
+
+/** "Yes from Nov 1" · "Not yet: safe from Dec 6" · "No: already short from Nov 5". */
+function detail(verdict: string, requested: string | null | undefined, earliest: string | null | undefined,
+  shortFrom: string | null | undefined): string {
+  if (verdict === "yes") return requested ? `from ${formatDay(requested)}` : "";
+  if (verdict === "not_yet") return earliest ? `safe from ${formatDay(earliest)}` : "";
+  return shortFrom ? `already short from ${formatDay(shortFrom)}` : "nothing in the next 13 weeks is safe";
+}
+
+const ifFixes = (fixes: Fix[]) =>
+  "If " + fixes.map((f) => `${f.name} ${f.kind === "reminder" ? "pays" : "agrees"}`).join(" and ");
+
+function VerdictLine({ label, verdict, text }: { label: string; verdict: string; text: string }) {
+  const v = VERDICT[verdict];
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="text-ink-2">{label}:</span>{" "}
+      <span className={`rounded-full px-2.5 py-0.5 font-semibold ${v.cls}`}>{v.label}</span>
+      {text && <span className="text-ink-2">{" "}— {text}</span>}
+    </li>
+  );
+}
+
+function Verdicts({ r }: { r: Afford }) {
+  if (!r.verdict) return null;
+  const fixed = r.with_fixes;
+  return (
+    <div className="space-y-1.5 text-sm">
+      <ul className="space-y-1.5" aria-label="Verdicts">
+        <VerdictLine label="Today" verdict={r.verdict} text={detail(r.verdict, r.requested_start, r.earliest_safe_start, r.short_from)} />
+        {fixed && (
+          <VerdictLine label={ifFixes(fixed.fixes)} verdict={fixed.verdict}
+            text={detail(fixed.verdict, r.requested_start, fixed.earliest_safe_start, fixed.short_from)} />
+        )}
+      </ul>
+      <p className="text-xs text-ink-3">
+        From your 13-week forecast. Safe means no week ends below your cushion.
+        {fixed && " The second line assumes the actions prepared on Today work out; nothing is sent until you approve it."}
+      </p>
+    </div>
+  );
+}
+
 /** One question → the agent maps it to a what-if → the engine's verdict, a cited sentence and a chart. */
 export function AffordBox() {
   const [question, setQuestion] = useState("");
   const ask = useAfford();
   const r = ask.data;
-  const verdict = r?.verdict ? VERDICT[r.verdict] : null;
 
   function submit(q: string) {
     if (q.trim().length >= 3 && !ask.isPending) ask.mutate(q.trim());
@@ -63,13 +108,7 @@ export function AffordBox() {
       )}
       {r && !ask.isPending && (
         <div className="mt-4 space-y-3" data-testid="afford-result">
-          {verdict && (
-            <p className="flex flex-wrap items-center gap-2 text-sm">
-              <span className={`rounded-full px-2.5 py-0.5 font-semibold ${verdict.cls}`}>{verdict.label}</span>
-              {r.verdict === "not_yet" && r.earliest_safe_start && <span className="text-ink-2">Earliest safe start: {formatDate(r.earliest_safe_start)}</span>}
-              <span className="text-xs text-ink-3">From your 13-week forecast. Safe means no week ends below your cushion.</span>
-            </p>
-          )}
+          <Verdicts r={r} />
           <Answer message={r.message} citations={r.citations} warnings={r.warnings} />
           {r.scenarios.length > 0 && <WhatIfPanel scenarios={r.scenarios as ScenarioInput[]} />}
         </div>

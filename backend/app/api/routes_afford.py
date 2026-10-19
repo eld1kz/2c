@@ -12,7 +12,7 @@ from app.agent.runner import ChatModel
 from app.api import routes_chat
 from app.api.deps import Principal, current_principal, get_chat_model, get_session
 from app.api.routes_whatif import require_simulation_role
-from app.api.schemas import AffordAskIn, AffordOut, CitationOut
+from app.api.schemas import AffordAskIn, AffordFixesOut, AffordFixOut, AffordOut, CitationOut
 from app.config import Settings, get_settings
 from app.engine.whatif import ScenarioError
 from app.services import afford
@@ -35,6 +35,14 @@ def ask(body: AffordAskIn, principal: Principal = Depends(current_principal), se
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
     finally:
         routes_chat.conversations.end(owner)
+    fixed = answer.with_fixes
     return AffordOut(verdict=answer.verdict, earliest_safe_start=answer.earliest_safe_start, message=answer.message,
                      citations=[CitationOut(**c) for c in answer.citations], warnings=answer.warnings,
-                     scenarios=answer.scenarios)
+                     scenarios=answer.scenarios,
+                     requested_start=answer.detail.requested_start if answer.detail else None,
+                     short_from=answer.detail.short_from if answer.detail else None,
+                     with_fixes=None if fixed is None else AffordFixesOut(
+                         verdict=fixed.verdict, earliest_safe_start=fixed.earliest_safe_start,
+                         short_from=fixed.short_from,
+                         fixes=[AffordFixOut(kind=d.kind, name=d.target_name or "", insight_id=d.insight.id)
+                                for d in answer.fixes]))

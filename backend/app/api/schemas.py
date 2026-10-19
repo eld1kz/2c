@@ -584,6 +584,19 @@ class AffordAskIn(BaseModel):
         return value
 
 
+class AffordFixOut(BaseModel):
+    kind: Literal["reminder", "terms_request"]  # reminder → the invoice is paid; terms_request → the supplier agrees
+    name: str  # customer or supplier name
+    insight_id: int
+
+
+class AffordFixesOut(BaseModel):
+    verdict: Literal["yes", "not_yet", "no"]
+    earliest_safe_start: date | None
+    short_from: date | None
+    fixes: list[AffordFixOut]
+
+
 class AffordOut(BaseModel):
     verdict: Literal["yes", "not_yet", "no"] | None  # from the engine; None if no plan could be checked
     earliest_safe_start: date | None
@@ -591,3 +604,6 @@ class AffordOut(BaseModel):
     citations: list[CitationOut]
     warnings: list[str]
     scenarios: list[dict[str, Any]]  # the checked plan, for the before/after chart (POST /whatif)
+    requested_start: date | None = None
+    short_from: date | None = None  # first week already below the cushion without the plan
+    with_fixes: AffordFixesOut | None = None  # the same plan if Today's fixes succeed (engine verdict)

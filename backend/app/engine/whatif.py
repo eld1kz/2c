@@ -43,7 +43,15 @@ class RemoveSeries:
     series_id: int
 
 
-Scenario = AddRecurring | OneOff | DelayReceivable | CollectReceivable | RemoveSeries
+@dataclass(frozen=True)
+class DelaySupplierPayments:
+    """A supplier agrees to longer terms on invoices not yet issued: the forecast's predicted
+    invoice-cycle payments to it move `days` later (past the horizon → out of the 13 weeks)."""
+    counterparty_id: int
+    days: int
+
+
+Scenario = AddRecurring | OneOff | DelayReceivable | CollectReceivable | RemoveSeries | DelaySupplierPayments
 
 
 @dataclass(frozen=True)
@@ -100,6 +108,14 @@ def _adjustments(base: Forecast, index: int, scenario: Scenario) -> list[Line]:
             if not found:
                 raise ScenarioError(f"series {series_id} has no occurrences in this forecast")
             return [_reverse(ln) for ln in found]
+        case DelaySupplierPayments(counterparty_id, days):
+            found = [ln for ln in base.lines if ln.kind == ForecastLineKind.recurring and ln.face < 0
+                     and ln.counterparty_id == counterparty_id and ln.source_ids[0].startswith("invoice:")]
+            if not found:
+                raise ScenarioError(f"no upcoming invoices from supplier {counterparty_id} in this forecast")
+            return [x for ln in found for x in (
+                _reverse(ln), Line(ln.on + timedelta(days=days), ForecastLineKind.scenario, ln.face,
+                                   ln.probability_bp, ln.source_ids, ln.counterparty_id))]
     raise ScenarioError(f"unsupported scenario {scenario!r}")
 
 

@@ -8,6 +8,9 @@ A plan is safe when, with it, no week of the 13-week forecast closes below the c
 - `no`: no start date inside the 13 weeks is safe.
 Only what the forecast can see counts: a cost starting near the end of the horizon is judged on
 the weeks left. `scenarios_at(day)` builds the plan's scenarios starting on `day`.
+
+`base` may itself be a what-if (e.g. Today's fixes succeeding, services/today.fixes): the same rule
+then gives the verdict in that world.
 """
 
 from collections.abc import Callable
@@ -31,6 +34,11 @@ class Affordability:
     @property
     def base_weeks_below(self) -> tuple[int, ...]:
         return tuple(w.week for w in self.result.base.weeks if w.below_buffer)
+
+    @property
+    def short_from(self) -> date | None:
+        """Start of the first week already below the cushion without the plan."""
+        return next((w.start for w in self.result.base.weeks if w.below_buffer), None)
 
     @property
     def weeks_below_with_it(self) -> tuple[int, ...]:

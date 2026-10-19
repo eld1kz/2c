@@ -611,6 +611,32 @@ export interface components {
             /** Question */
             question: string;
         };
+        /** AffordFixOut */
+        AffordFixOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reminder" | "terms_request";
+            /** Name */
+            name: string;
+            /** Insight Id */
+            insight_id: number;
+        };
+        /** AffordFixesOut */
+        AffordFixesOut: {
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "yes" | "not_yet" | "no";
+            /** Earliest Safe Start */
+            earliest_safe_start: string | null;
+            /** Short From */
+            short_from: string | null;
+            /** Fixes */
+            fixes: components["schemas"]["AffordFixOut"][];
+        };
         /** AffordOut */
         AffordOut: {
             /** Verdict */
@@ -627,6 +653,11 @@ export interface components {
             scenarios: {
                 [key: string]: unknown;
             }[];
+            /** Requested Start */
+            requested_start?: string | null;
+            /** Short From */
+            short_from?: string | null;
+            with_fixes?: components["schemas"]["AffordFixesOut"] | null;
         };
         /** AgingOut */
         AgingOut: {

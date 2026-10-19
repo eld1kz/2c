@@ -133,9 +133,11 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
   - a 5% raise = payroll × 5% computed by the engine;
   - the supplied amount is never evidence;
   - the badge keeps the engine verdict when the text disagrees;
-  - viewer 403 with no model call; budget respected.
+  - viewer 403 with no model call; budget respected;
+  - the second verdict "if Today's fixes succeed" (Harbor Lane pays INV-1042, Verde agrees to +30 days): the fixes are exactly those two; the 3% raise chip → Yes, the barista → Not yet (Dec 6), the machine → Not yet; longer terms move only that supplier's upcoming invoices.
 - Live check (Oct 18): all three chips answer No with valid citations and no warnings, once the request tells the model not to restate the owner's amount.
-- `frontend/e2e/today.spec.ts`: a chip asks; badge, cited sentence and chart render; viewers get no box.
+- `frontend/e2e/today.spec.ts`: a chip asks; both verdict lines, cited sentence and chart render; viewers get no box.
+- Oct 19: the raise chip is 3% (a 5% raise misses the cushion by $34.52 in week 9 on the golden data even with the fixes), so one chip answers Yes once Today's fixes succeed. Code freeze after this: bug fixes only.
 
 ## Phase 7 — Ship  *(Oct 18–20)*
 - Deploy: one Singapore VPS with Docker Compose (Caddy → Next.js → FastAPI → Postgres) and a custom domain, reachable from mainland China (SPEC §3). README with setup/deploy/tests.

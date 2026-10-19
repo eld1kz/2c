@@ -7,14 +7,15 @@ import pytest
 
 from app.agent.citations import validate
 from app.config import get_settings
-from app.db.models import Cadence, ForecastLineKind
+from app.db.models import Cadence, ForecastLineKind, Invoice
 from app.engine.afford import affordability
 from app.engine.forecast import CERTAIN_BP, Line, build
 from app.engine.snapshot import load_snapshot
-from app.engine.whatif import OneOff, ScenarioError
+from app.engine.whatif import DelaySupplierPayments, OneOff, ScenarioError, run_what_if
 from app.services import ledger
 from app.services.llm_budget import LlmBudget
 from app.services.scenarios import AddRecurringIn, OneOffIn, RaisePayrollIn, assess, payroll_raise
+from app.services.today import fixes
 from tests.conftest import ChatHarness, Demo
 from tests.fakes import ScriptedModel, tool_result
 from tests.test_agent_tools import _call, _ctx
@@ -90,6 +91,47 @@ def test_the_tool_never_counts_the_supplied_amount_as_evidence(demo: Demo) -> No
     assert ok.ok, ok.warnings
 
 
+def test_longer_terms_move_only_the_suppliers_upcoming_invoices() -> None:
+    lines = [Line(TODAY, ForecastLineKind.opening, 1_000_000, CERTAIN_BP, ("account:1",)),
+             Line(TODAY + timedelta(days=7), ForecastLineKind.ap_due, -100_000, CERTAIN_BP, ("invoice:1",), 6),
+             Line(TODAY + timedelta(days=14), ForecastLineKind.recurring, -200_000, CERTAIN_BP, ("invoice:1",), 6),
+             Line(TODAY + timedelta(days=84), ForecastLineKind.recurring, -300_000, CERTAIN_BP, ("invoice:1",), 6),
+             Line(TODAY + timedelta(days=14), ForecastLineKind.recurring, -50_000, CERTAIN_BP, ("invoice:2",), 7),
+             Line(TODAY + timedelta(days=14), ForecastLineKind.recurring, -40_000, CERTAIN_BP, ("recurring_series:1",), 6)]
+    base = build(TODAY, "USD", 0, lines, {})
+    r = run_what_if(base, [DelaySupplierPayments(6, 30)])
+    # week 3's 2,000 moves to week 7; week 13's 3,000 moves past the horizon; the open bill, the other
+    # supplier and the rent-like series stay put
+    assert r.closing_delta == (0, 0, 200_000, 200_000, 200_000, 200_000, 0, 0, 0, 0, 0, 0, 300_000)
+    with pytest.raises(ScenarioError):
+        run_what_if(base, [DelaySupplierPayments(8, 30)])
+
+
+def test_golden_fixes_are_harbor_lane_paying_and_verde_agreeing(demo: Demo) -> None:
+    found = {d.kind: (d.target_name, s) for d, s in fixes(demo.session, demo.business.id, TODAY)}
+    assert set(found) == {"reminder", "terms_request"}  # the price email has no cash figure
+    name, collect = found["reminder"]
+    assert name == "Harbor Lane Café" and demo.session.get(Invoice, collect.invoice_id).number == "INV-1042"
+    assert collect.on == TODAY
+    name, terms = found["terms_request"]
+    assert (name, terms.days) == ("Verde Green Coffee Imports", 30)
+
+
+@pytest.mark.parametrize(("item", "fixed", "safe_from"), [
+    (AddRecurringIn(type="add_recurring", amount_cents=-250_000, cadence=Cadence.monthly, start=date(2026, 11, 1)),
+     "not_yet", date(2026, 12, 6)),
+    (RaisePayrollIn(type="raise_payroll", percent=3, start=TODAY), "yes", TODAY),  # the chip with a Yes
+    (OneOffIn(type="one_off", amount_cents=-300_000, on=TODAY), "not_yet", date(2026, 12, 10)),
+])
+def test_golden_chips_today_and_with_fixes(demo: Demo, item: AddRecurringIn | OneOffIn | RaisePayrollIn,
+                                           fixed: str, safe_from: date) -> None:
+    snap = load_snapshot(demo.session, demo.business.id, TODAY)
+    now = assess(demo.session, snap, TODAY, item)
+    assert (now.verdict, now.short_from) == ("no", date(2026, 11, 5))
+    after = assess(demo.session, snap, TODAY, item, [s for _, s in fixes(demo.session, demo.business.id, TODAY)])
+    assert (after.verdict, after.earliest_safe_start, after.short_from) == (fixed, safe_from, None)
+
+
 # --- API ----------------------------------------------------------------------------------
 
 
@@ -110,6 +152,11 @@ def test_a_cited_answer_with_the_engine_verdict(chat: ChatHarness) -> None:
     assert (body["verdict"], body["earliest_safe_start"], body["warnings"]) == ("no", None, [])
     assert body["message"].startswith("No:") and all(c["valid"] for c in body["citations"])
     assert body["scenarios"] == [BARISTA]
+    assert (body["requested_start"], body["short_from"]) == ("2026-11-01", "2026-11-05")
+    fixed = body["with_fixes"]
+    assert (fixed["verdict"], fixed["earliest_safe_start"], fixed["short_from"]) == ("not_yet", "2026-12-06", None)
+    assert {(f["kind"], f["name"]) for f in fixed["fixes"]} == {("reminder", "Harbor Lane Café"),
+                                                                 ("terms_request", "Verde Green Coffee Imports")}
     assert all(req["tools"] == ["check_affordability"] for req in chat.model.requests)
     assert "Hire a barista at $2,500/month from November?" in chat.model.sent
 

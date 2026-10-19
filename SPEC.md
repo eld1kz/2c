@@ -209,7 +209,8 @@ Cash basis throughout: income is money received and expenses are money paid in t
   - The verdict is the engine's. A plan is safe when no week of the 13-week forecast closes below the cushion. **Yes** = safe as asked; **Not yet** = safe from a later week start inside the horizon (the earliest is given); **No** = no start within 13 weeks is safe.
   - The API recomputes the verdict from the validated scenario and returns it for the badge. An answer that doesn't open with it carries a warning.
   - Same admission, citation and claim checks as chat; only `check_affordability` is offered; owner/accountant only; nothing is stored. A before/after chart comes from `POST /whatif`.
-  - On the golden data every plan is No, because cash is already below the cushion from week 6.
+  - **A second verdict: if Today's fixes succeed.** Same rule, computed by the engine on the base forecast plus the what-if scenarios behind Today's decisions (`services/today.fixes`): a reminder → the invoice is collected today (`collect_receivable`); a terms request → the supplier's upcoming invoices (the forecast's predicted invoice-cycle payments, as the email asks for invoices issued from today) are paid 30 days later (`DelaySupplierPayments`, engine-only; a payment pushed past week 13 leaves the horizon). A price email has no cash figure and is left out. The UI shows two lines: "Today: No — already short from Nov 5" and "If Harbor Lane Café pays and Verde Green Coffee Imports agrees: Yes from … / Not yet — safe from … / No". The AI sentence speaks only to today's verdict and stays cited.
+  - On the golden data every plan is No today, because cash is already below the cushion from week 6. With Today's fixes: a 3% raise → Yes; the barista → Not yet (Dec 6); the $3,000 machine → Not yet.
 
 ## 7. Agent
 
@@ -280,7 +281,7 @@ Fictional vendor names only (no real brands).
 ---
 
 ## 10. Frontend pages
-- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went, and (owner/accountant) a "Can I afford it?" box with three example chips (a hire, a 5% raise, an espresso machine). Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
+- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went, and (owner/accountant) a "Can I afford it?" box with three example chips (a hire, a 3% raise, an espresso machine). Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
 - `/dashboard` — cash now, 13-week chart with buffer line, top 3 insights, pending approvals count
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button
