@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2Icon, LoaderCircleIcon, MessageSquareTextIcon } from "lucide-react";
+import { LoaderCircleIcon, MessageSquareTextIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -11,6 +11,8 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ApiError, type Schemas } from "@/lib/api/client";
 import { usePendingActions, usePrepare } from "@/lib/api/hooks";
 import { askAbout } from "@/lib/labels";
+
+import { SentMark } from "./sent-mark";
 
 type Decision = Schemas["TodayDecisionOut"];
 type Action = Schemas["ActionOut"];
@@ -29,6 +31,11 @@ export function DecisionCard({ decision, role, onSheet }: { decision: Decision; 
   const pending = usePendingActions();
   const [action, setActionState] = useState<Action | null>(null);
   const setAction = (a: Action | null) => (setActionState(a), onSheet?.(a !== null));
+  const [justSent, setJustSent] = useState(false);
+  function decided(a: Action) {
+    setAction(a);
+    if (a.status === "executed") setJustSent(true);
+  }
   const insightId = Number(decision.insight.ref.split(":")[1]);
   const canAct = role === "owner" || (role === "accountant" && !OWNER_ONLY.has(decision.kind));
 
@@ -47,12 +54,8 @@ export function DecisionCard({ decision, role, onSheet }: { decision: Decision; 
         </Link>
       </Button>
     );
-  } else if (decision.sent_action_id) {
-    control = (
-      <p className="flex items-center gap-1.5 text-sm font-medium text-good-ink">
-        <CheckCircle2Icon className="size-4" /> Sent
-      </p>
-    );
+  } else if ((decision.sent_action_id || justSent) && action === null) {
+    control = <SentMark fresh={justSent} />; // shown once the sheet closes, so the check draws in view
   } else if (!canAct) {
     control = <p className="text-sm text-ink-3">{role === "viewer" ? "The owner or accountant decides this." : "The owner approves this."}</p>;
   } else {
@@ -65,8 +68,8 @@ export function DecisionCard({ decision, role, onSheet }: { decision: Decision; 
   }
 
   return (
-    <article className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5" aria-label={decision.text}>
-      <p className="text-[17px] leading-snug font-medium text-ink">{decision.text}</p>
+    <article className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5 md:p-6" aria-label={decision.text}>
+      <p className="text-[17px] leading-[1.45] font-medium text-ink">{decision.text}</p>
       <div className="flex flex-wrap gap-1.5">
         {decision.evidence.slice(0, 3).map((e) => (
           <EvidenceChip key={e.ref} evidence={e} />
@@ -81,7 +84,7 @@ export function DecisionCard({ decision, role, onSheet }: { decision: Decision; 
       <Sheet open={action !== null} onOpenChange={(isOpen) => !isOpen && setAction(null)}>
         {action && (
           <SheetContent title="Ready for your approval" description="Nothing is sent until you approve it.">
-            <ApprovalCard action={action} onDecided={setAction} />
+            <ApprovalCard action={action} onDecided={decided} />
           </SheetContent>
         )}
       </Sheet>

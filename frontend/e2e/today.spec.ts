@@ -21,7 +21,8 @@ const reminderAction = (invoice: string, customer: string, status: string, sandb
 test("sign-in lands on Today: three decisions, safe to spend, where the money went", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hello, Demo Owner");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Demo Owner\.$/);
+  await expect(page.getByText("Here's your money today.")).toBeVisible();
   const decisions = page.getByRole("region", { name: "Decisions" }).getByRole("article");
   await expect(decisions).toHaveCount(3);
   await expect(decisions.nth(0)).toContainText("Verde Green Coffee Imports raised GRN-COL-HUILA by 18%");
@@ -63,6 +64,10 @@ test("one tap prepares the reminder and opens it for approval", async ({ page })
   await card.getByRole("button", { name: "Approve and send" }).click();
   await expect(card.getByTestId("sandbox-result")).toContainText("Sandbox email #9 sent to Harbor Lane Café");
   expect(prepared).toBe(1);
+  await page.keyboard.press("Escape");
+  const sent = page.getByRole("article", { name: /Harbor Lane Café owes you/ }).getByTestId("sent-mark");
+  await expect(sent).toHaveText("Sent"); // shown once the sheet closes, with the one-time check animation
+  await expect(sent).toHaveAttribute("data-fresh", "true");
   expect(errors).toEqual([]);
 });
 

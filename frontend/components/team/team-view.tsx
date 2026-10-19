@@ -4,11 +4,11 @@ import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 
 import { EvidenceChip } from "@/components/evidence/evidence-chip";
+import { Money } from "@/components/money";
 import { AffordBox } from "@/components/today/afford-box";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useTeam } from "@/lib/api/hooks";
-import { formatCents } from "@/lib/money";
 
 const input = "h-10 rounded-lg border border-line-strong bg-surface px-3 text-sm outline-none focus:border-brand";
 
@@ -44,12 +44,14 @@ export function TeamView() {
   const raise = dollars(raiseBy);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-[26px] leading-[1.2] font-semibold tracking-tight text-ink md:text-[30px]">Your team</h1>
-        <p className="mt-1 text-[15px] text-ink-2">
+    <div className="mx-auto max-w-2xl space-y-8">
+      <header className="pt-2 md:pt-4">
+        <h1 className="font-display text-[30px] leading-[1.15] font-medium tracking-[-0.01em] text-ink md:text-[38px]">Your team</h1>
+        <p className="mt-2 text-[17px] text-ink-2">
           {data.people.length} people
-          {data.weekly_total_cents !== null && data.weekly_total_cents !== undefined && `, ${formatCents(data.weekly_total_cents)}/week`}
+          {data.weekly_total_cents !== null && data.weekly_total_cents !== undefined && (
+            <>, <Money cents={data.weekly_total_cents} className="font-semibold text-ink" split />/week</>
+          )}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-3">
           <span>A breakdown of your payroll payments{data.pay_visible ? "" : " (pay is visible to the owner and accountant)"}.</span>
@@ -58,19 +60,19 @@ export function TeamView() {
         {!data.matches_payroll && data.pay_visible && (
           <p role="alert" className="mt-2 text-sm text-attn-ink">This list no longer adds up to the payroll in your books.</p>
         )}
-      </div>
+      </header>
 
       <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface" aria-label="Team">
         {data.people.map((p) => (
-          <li key={p.name} className="space-y-3 p-4">
-            <div className="flex items-center gap-3">
-              <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand-ink">{p.initials}</span>
+          <li key={p.name} className="space-y-3 px-5 py-4 md:px-6">
+            <div className="flex items-center gap-4">
+              <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-soft font-display text-[15px] font-medium text-brand-ink">{p.initials}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-medium text-ink">{p.name}</span>
                 <span className="block text-sm text-ink-2">{p.role}</span>
               </span>
               {p.weekly_pay_cents !== null && p.weekly_pay_cents !== undefined && (
-                <span className="text-sm whitespace-nowrap text-ink">{formatCents(p.weekly_pay_cents)}/week</span>
+                <span className="text-[15px] whitespace-nowrap text-ink"><Money cents={p.weekly_pay_cents} className="font-medium" />/week</span>
               )}
             </div>
             {canAsk && (raiseFor === p.name ? (
@@ -89,7 +91,7 @@ export function TeamView() {
       </ul>
 
       {canAsk && (
-        <section className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-4" aria-labelledby="hire-title">
+        <section className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5 md:p-6" aria-labelledby="hire-title">
           <h2 id="hire-title" className="flex items-center gap-1.5 text-[15px] font-semibold"><PlusIcon className="size-4" /> Hire someone</h2>
           <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={(e) => (e.preventDefault(), hire && hireRole.trim() && open(`Hire a ${hireRole.trim()} at ${hire}/week from today?`))}>
             <label className="text-sm text-ink-2">Role

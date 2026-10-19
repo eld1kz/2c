@@ -11,12 +11,22 @@ export function Money({
   signed,
   tone = "plain",
   className,
+  split,
 }: {
   cents: number;
   currency?: string;
   signed?: boolean;
   tone?: Tone;
   className?: string;
+  split?: boolean; // cents small and raised (headline amounts)
 }) {
-  return <span className={cn("num whitespace-nowrap", TONES[tone], className)}>{formatCents(cents, currency, { signed })}</span>;
+  const text = formatCents(cents, currency, { signed });
+  const dot = text.lastIndexOf(".");
+  if (!split || dot < 0) return <span className={cn("num whitespace-nowrap", TONES[tone], className)}>{text}</span>;
+  return (
+    <span className={cn("num whitespace-nowrap", TONES[tone], className)}>
+      {text.slice(0, dot)}
+      <span className="cents">{text.slice(dot)}</span>
+    </span>
+  );
 }

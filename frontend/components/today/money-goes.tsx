@@ -14,7 +14,7 @@ export function MoneyGoes({ spending, currency }: { spending: Schemas["SpendingO
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5" aria-labelledby="goes-title">
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="goes-title" className="text-[15px] font-semibold">Where your money went in {spending.period.label.split(" ")[0]}</h2>
-        <Money cents={spending.total_cents} currency={currency} className="text-sm font-semibold" />
+        <Money cents={spending.total_cents} currency={currency} className="text-[17px] font-semibold" split />
       </div>
       <Link href="/paperwork" className="mt-3 block space-y-2.5 rounded-lg outline-offset-4" aria-label="Open the full profit and loss">
         {top.map((l) => (
@@ -28,7 +28,7 @@ export function MoneyGoes({ spending, currency }: { spending: Schemas["SpendingO
             </div>
           </div>
         ))}
-        <p className="pt-1 text-sm font-medium text-brand-ink">See the full profit and loss →</p>
+        <p className="pt-1 text-sm font-medium text-brand-ink">See the full profit and loss</p>
       </Link>
     </section>
   );

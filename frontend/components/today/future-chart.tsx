@@ -31,14 +31,16 @@ export function FutureChart({ future, currency, hold }: { future: Future; curren
     : null;
 
   return (
-    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5" aria-labelledby="future-title">
-      <h2 id="future-title" className="text-xs font-medium text-ink-3">Your next 13 weeks</h2>
+    <section
+      className="rounded-[var(--radius-hero)] bg-surface p-5 shadow-[0_1px_2px_rgba(24,33,58,0.06),0_12px_32px_-12px_rgba(24,33,58,0.18)] ring-1 ring-line md:p-8"
+      aria-label="Your next 13 weeks"
+    >
       <div aria-live="polite">
-        <p className="mt-1 text-[17px] leading-snug font-medium text-ink" data-testid="future-headline">{f.headline}</p>
-        <p className="text-sm text-ink-2">{f.detail}</p>
+        <h2 className="font-display text-[23px] leading-[1.25] font-medium text-ink md:text-[28px]" data-testid="future-headline">{f.headline}</h2>
+        <p className="mt-2 text-[15px] text-ink-2">{f.detail}</p>
       </div>
 
-      <div className="relative mt-4 h-36" role="img" aria-label={`Weekly cash for 13 weeks. ${f.headline} ${f.detail}`}>
+      <div className="relative mt-6 h-48 md:h-60" role="img" aria-label={`Weekly cash for 13 weeks. ${f.headline} ${f.detail}`}>
         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
           {f.weeks.map((w) => {
             const a = y(Math.max(w.closing_cents, 0));
@@ -75,10 +77,11 @@ export function FutureChart({ future, currency, hold }: { future: Future; curren
         ))}
       </div>
 
-      <ul className="mt-3 space-y-1 text-xs text-ink-2">
+      <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-[13px] text-ink-2">
         <li className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-good" /> Above your cushion</span>
           <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-risk" /> Below it</span>
+          <span className="text-ink-3">Weekly closing cash for your next 13 weeks</span>
         </li>
         {f.applied.length > 0 && <li>Includes the fixes you approved: {f.applied.map(fixText).join(", ")}.</li>}
         {f.pending.length > 0 && f.pending_headline && (
