@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMe, useToday } from "@/lib/api/hooks";
+import { Lineup } from "@/components/team/lineup";
+import { useMe, useTeam, useToday } from "@/lib/api/hooks";
 import Link from "next/link";
 
 import { Money } from "@/components/money";
@@ -24,6 +25,7 @@ function partOfDay(hour: number): string {
 export function TodayView() {
   const me = useMe();
   const { data, isError } = useToday();
+  const team = useTeam();
   const [sheetOpen, setSheetOpen] = useState(false);
   if (isError) return <p className="text-sm text-risk-ink">Today couldn&apos;t be loaded. Refresh the page to try again.</p>;
   if (!data || !me.data) return <Skeleton className="h-96" />;
@@ -34,15 +36,7 @@ export function TodayView() {
           Good {partOfDay(new Date().getHours())}, {data.name}.
         </h1>
         <p className="mt-2 text-[17px] text-ink-2">Here&apos;s your money today.</p>
-        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-3">
-          <span>{formatDate(data.as_of)}</span>
-          <Link href="/team" className="text-brand-ink hover:underline" data-testid="team-line">
-            Your team: {data.team.people} people
-            {data.team.weekly_total_cents !== null && data.team.weekly_total_cents !== undefined && (
-              <>, <Money cents={data.team.weekly_total_cents} currency={data.currency} />/week</>
-            )}
-          </Link>
-        </p>
+        <p className="mt-3 text-sm text-ink-3">{formatDate(data.as_of)}</p>
       </header>
       <FutureChart future={data.future} currency={data.currency} hold={sheetOpen} />
       <section className="space-y-3" aria-labelledby="decisions-title">
@@ -53,6 +47,18 @@ export function TodayView() {
           <DecisionCard key={d.insight.ref} decision={d} role={me.data.user.role} onSheet={setSheetOpen} />
         ))}
       </section>
+      <Link href="/team" aria-label="Your team: open the Team page"
+        className="group flex flex-wrap items-end justify-between gap-x-6 gap-y-3 rounded-[var(--radius-panel)] border border-line bg-surface px-5 pt-4 pb-3 hover:border-line-strong">
+        <span className="pb-2">
+          <span className="block text-[15px] font-semibold text-ink" data-testid="team-line">
+            Your team: {data.team.people} people
+            {data.team.weekly_total_cents !== null && data.team.weekly_total_cents !== undefined && (
+              <>, <Money cents={data.team.weekly_total_cents} currency={data.currency} />/week</>
+            )}
+          </span>
+        </span>
+        {team.data && <Lineup people={team.data.people} size="sm" />}
+      </Link>
       {me.data.user.role !== "viewer" && <AffordBox />}
       <SafeToSpend safe={data.safe_to_spend} currency={data.currency} />
       <MoneyGoes spending={data.spending} currency={data.currency} />

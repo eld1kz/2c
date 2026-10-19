@@ -56,7 +56,7 @@ test("+ Hire someone asks with the role and weekly pay", async ({ page }) => {
   await page.goto("/team");
   const asked = await recordAfford(page);
   const hire = page.getByRole("region", { name: "Hire someone" });
-  await hire.getByLabel("Role").fill("Roaster");
+  await hire.getByLabel("Role", { exact: true }).fill("Roaster");
   await hire.getByLabel("Weekly pay ($)").fill("820.5");
   await hire.getByRole("button", { name: "Can I afford it?" }).click();
   await expect(page.getByRole("region", { name: "Can I afford it?" }).getByTestId("afford-result")).toBeVisible();
@@ -84,4 +84,60 @@ test("Team is under More", async ({ page }, info) => {
   } else {
     await expect(page.getByRole("navigation", { name: "Main" }).first().getByRole("link", { name: "Team" })).toBeVisible();
   }
+});
+
+test("the lineup: five labelled characters, tap one for their card, and a hire preview", async ({ page }, info) => {
+  const errors = watchConsole(page);
+  await signIn(page, "owner");
+  await page.goto("/team");
+  const asked = await recordAfford(page);
+  const photo = page.getByRole("region", { name: "Team photo" });
+  for (const label of ["Illustration of Maya, head roaster", "Illustration of Daniel, roaster", "Illustration of Priya, barista lead",
+    "Illustration of Tom, barista", "Illustration of Aiko, packing and shipping"]) {
+    await expect(photo.getByRole("img", { name: label })).toBeVisible();
+  }
+  await expect(photo).toContainText("$742.00/wk");
+
+  await photo.getByRole("button", { name: /Tom/ }).click();
+  const card = page.getByRole("dialog", { name: "Tom Lindqvist" });
+  await expect(card.getByRole("img", { name: "Illustration of Tom, barista" })).toBeVisible();
+  await expect(card).toContainText("$742.00/week");
+  await card.getByLabel("Raise for Tom Lindqvist per week").fill("25");
+  await card.getByRole("button", { name: "Can I afford it?" }).click();
+  await expect(card).toBeHidden();
+  await expect(page.getByRole("region", { name: "Can I afford it?" }).getByTestId("afford-result")).toBeVisible();
+  expect(asked).toEqual(["Give Tom Lindqvist (Barista) a raise of $25.00/week from today?"]);
+
+  await expect(photo.getByRole("img", { name: /^Preview/ })).toHaveCount(0); // an empty dashed spot until a role is chosen
+  await page.getByRole("group", { name: "Pick a role" }).getByRole("button", { name: "Baker" }).click();
+  await expect(photo.getByRole("img", { name: "Preview: illustration of a new baker" })).toBeVisible();
+  await photo.getByRole("button", { name: /Hire someone/ }).click();
+  await expect(page.getByLabel("Role", { exact: true })).toBeFocused();
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0); // on a phone the row scrolls inside its own box
+  await page.screenshot({ path: `e2e/.results/team-lineup-${info.project.name}.png`, fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("Today shows the lineup small, and it opens the Team page", async ({ page }) => {
+  await signIn(page, "viewer");
+  const small = page.getByTestId("lineup-sm");
+  await expect(small.getByRole("img")).toHaveCount(5);
+  await expect(small.getByRole("img", { name: "Illustration of Maya, head roaster" })).toBeVisible();
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
+  await page.getByRole("link", { name: "Your team: open the Team page" }).click();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByRole("region", { name: "Team photo" })).not.toContainText("/wk"); // viewers: no pay
+});
+
+test("the characters bob on hover, but not with reduced motion", async ({ page }, info) => {
+  test.skip(info.project.name === "phone", "hover needs a pointer");
+  await signIn(page, "owner");
+  await page.goto("/team");
+  const tom = page.getByRole("region", { name: "Team photo" }).getByRole("button", { name: /Tom/ });
+  const anim = () => tom.locator("span").first().locator("span").first().evaluate((el) => getComputedStyle(el).animationName);
+  await tom.hover();
+  expect(await anim()).toBe("lw-bob");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await tom.hover();
+  expect(await anim()).toBe("none");
 });
