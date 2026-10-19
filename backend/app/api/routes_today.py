@@ -16,6 +16,9 @@ from app.api.schemas import (
     ActionOut,
     BillOut,
     EvidenceRef,
+    FutureFixOut,
+    FutureOut,
+    FutureWeekOut,
     SafeToSpendOut,
     SpendingOut,
     TodayDecisionOut,
@@ -26,7 +29,7 @@ from app.db.models import User
 from app.engine import statements as st
 from app.engine.forecast import project
 from app.engine.snapshot import load_snapshot
-from app.engine.today import safe_to_spend, spending
+from app.engine.today import outlook, safe_to_spend, spending
 from app.services import ledger, today
 from app.services.action_service import ActionService, utc_now
 
@@ -56,8 +59,23 @@ def get_today(user: User = Depends(current_user), session: Session = Depends(get
             evidence=[ev(r) for r in d.evidence_ids[:6]], pending_action_id=pending.id if pending else None,
             sent_action_id=sent.id if sent else None)
 
+    ahead = today.future(session, user.business_id, day, utc_now())
+    now_view, then = outlook(ahead.applied), outlook(ahead.pending) if ahead.pending else None
+    pending_weeks = ahead.pending.weeks if ahead.pending else [None] * len(ahead.applied.weeks)
+
+    def fix(d: today.Decision) -> FutureFixOut:
+        return FutureFixOut(insight_id=d.insight.id, kind=d.kind, name=d.target_name or "")
+
+    future = FutureOut(
+        cushion_cents=ahead.applied.min_cash_buffer,
+        weeks=[FutureWeekOut(week=w.week, start=w.start, closing_cents=w.closing,
+                             pending_closing_cents=p.closing if p else None, below_cushion=w.below_buffer)
+               for w, p in zip(ahead.applied.weeks, pending_weeks)],
+        headline=now_view.headline, detail=now_view.detail, pending_headline=then.headline if then else None,
+        applied=[fix(d) for d in ahead.applied_fixes], pending=[fix(d) for d in ahead.pending_fixes])
+
     return TodayOut(
-        as_of=day, currency=snap.currency, name=user.name,
+        as_of=day, currency=snap.currency, name=user.name, future=future,
         decisions=[out(d) for d in decisions],
         safe_to_spend=SafeToSpendOut(
             cash_cents=safe.cash, cushion_cents=safe.cushion, bills_total_cents=safe.bills_total,

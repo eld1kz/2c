@@ -5,6 +5,9 @@ Safe to spend = cash now − the cushion (minimum cash buffer) − bills due in 
 a bill is a recurring-series payment or an open supplier invoice in forecast week 1 (overdue ones
 are already placed there). Expected money in and typical day-to-day spending are left out on
 purpose: the figure is what could go out without touching the cushion even if nothing comes in.
+
+The cushion outlook is the one-line headline over Today's 13-week chart: the first week that closes
+below the cushion and the lowest week, with how far it is above or below the cushion.
 """
 
 from dataclasses import dataclass
@@ -12,6 +15,7 @@ from datetime import date
 
 from app.db.models import ForecastLineKind
 from app.engine.forecast import Forecast
+from app.engine.insights.base import money
 from app.engine.snapshot import Snapshot
 from app.engine.statements import PnlLine, ProfitAndLoss
 
@@ -73,3 +77,33 @@ class Spending:
 def spending(pnl: ProfitAndLoss) -> Spending:
     lines = sorted((*pnl.cogs, *pnl.operating_expenses), key=lambda ln: (-ln.amount, ln.key))
     return Spending(pnl, tuple(lines))
+
+
+@dataclass(frozen=True)
+class CushionOutlook:
+    first_below: date | None  # start of the first week closing below the cushion
+    lowest_week: int
+    lowest_start: date
+    lowest_vs_cushion: int  # lowest closing − cushion (negative = below)
+    headline: str
+    detail: str
+
+
+def _day(d: date) -> str:
+    return f"{d:%b} {d.day}"
+
+
+def outlook(forecast: Forecast) -> CushionOutlook:
+    below = [w for w in forecast.weeks if w.below_buffer]
+    low = min(forecast.weeks, key=lambda w: (w.closing, w.week))
+    first = below[0] if below else None
+    if first is None:
+        headline = f"Cash stays above your cushion for all {len(forecast.weeks)} weeks."
+    elif first.week == 1:
+        headline = "Cash is below your cushion this week."
+    else:
+        headline = f"Cash stays above your cushion until {_day(first.start)}."
+    gap = low.closing - forecast.min_cash_buffer
+    side = "below" if gap < 0 else "above"
+    detail = f"Lowest week: {_day(low.start)}, {money(abs(gap), forecast.currency)} {side} your cushion."
+    return CushionOutlook(first.start if first else None, low.week, low.start, gap, headline, detail)

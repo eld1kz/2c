@@ -1007,6 +1007,54 @@ export interface components {
             /** Below Buffer */
             below_buffer: boolean;
         };
+        /** FutureFixOut */
+        FutureFixOut: {
+            /** Insight Id */
+            insight_id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reminder" | "terms_request";
+            /** Name */
+            name: string;
+        };
+        /**
+         * FutureOut
+         * @description Today's 13-week chart (engine-only, SPEC §6.9).
+         */
+        FutureOut: {
+            /** Cushion Cents */
+            cushion_cents: number;
+            /** Weeks */
+            weeks: components["schemas"]["FutureWeekOut"][];
+            /** Headline */
+            headline: string;
+            /** Detail */
+            detail: string;
+            /** Pending Headline */
+            pending_headline: string | null;
+            /** Applied */
+            applied: components["schemas"]["FutureFixOut"][];
+            /** Pending */
+            pending: components["schemas"]["FutureFixOut"][];
+        };
+        /** FutureWeekOut */
+        FutureWeekOut: {
+            /** Week */
+            week: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Closing Cents */
+            closing_cents: number;
+            /** Pending Closing Cents */
+            pending_closing_cents: number | null;
+            /** Below Cushion */
+            below_cushion: boolean;
+        };
         /** GapOut */
         GapOut: {
             /** First Week */
@@ -1451,6 +1499,7 @@ export interface components {
             decisions: components["schemas"]["TodayDecisionOut"][];
             safe_to_spend: components["schemas"]["SafeToSpendOut"];
             spending: components["schemas"]["SpendingOut"];
+            future: components["schemas"]["FutureOut"];
         };
         /** TokenOut */
         TokenOut: {

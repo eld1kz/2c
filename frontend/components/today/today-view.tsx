@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe, useToday } from "@/lib/api/hooks";
 import { formatDate } from "@/lib/money";
 
 import { AffordBox } from "./afford-box";
 import { DecisionCard } from "./decision-card";
+import { FutureChart } from "./future-chart";
 import { MoneyGoes } from "./money-goes";
 import { SafeToSpend } from "./safe-to-spend";
 
@@ -13,6 +16,7 @@ import { SafeToSpend } from "./safe-to-spend";
 export function TodayView() {
   const me = useMe();
   const { data, isError } = useToday();
+  const [sheetOpen, setSheetOpen] = useState(false);
   if (isError) return <p className="text-sm text-risk-ink">Today couldn&apos;t be loaded. Refresh the page to try again.</p>;
   if (!data || !me.data) return <Skeleton className="h-96" />;
   return (
@@ -24,9 +28,10 @@ export function TodayView() {
           {data.decisions.length ? `${data.decisions.length === 1 ? "One decision" : `${data.decisions.length} decisions`} worth your time today.` : "Nothing needs a decision today."}
         </p>
       </div>
+      <FutureChart future={data.future} currency={data.currency} hold={sheetOpen} />
       <section className="space-y-3" aria-label="Decisions">
         {data.decisions.map((d) => (
-          <DecisionCard key={d.insight.ref} decision={d} role={me.data.user.role} />
+          <DecisionCard key={d.insight.ref} decision={d} role={me.data.user.role} onSheet={setSheetOpen} />
         ))}
       </section>
       {me.data.user.role !== "viewer" && <AffordBox />}

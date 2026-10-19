@@ -563,6 +563,31 @@ class SpendingOut(BaseModel):
     total_cents: int
 
 
+class FutureWeekOut(BaseModel):
+    week: int
+    start: date
+    closing_cents: int  # with every approved fix
+    pending_closing_cents: int | None  # also with the fixes not approved yet
+    below_cushion: bool
+
+
+class FutureFixOut(BaseModel):
+    insight_id: int
+    kind: Literal["reminder", "terms_request"]
+    name: str
+
+
+class FutureOut(BaseModel):
+    """Today's 13-week chart (engine-only, SPEC §6.9)."""
+    cushion_cents: int
+    weeks: list[FutureWeekOut]
+    headline: str  # e.g. "Cash stays above your cushion until Nov 5."
+    detail: str  # the lowest week vs the cushion
+    pending_headline: str | None  # the same headline if the remaining fixes are approved
+    applied: list[FutureFixOut]
+    pending: list[FutureFixOut]
+
+
 class TodayOut(BaseModel):
     as_of: date
     currency: str
@@ -570,6 +595,7 @@ class TodayOut(BaseModel):
     decisions: list[TodayDecisionOut]
     safe_to_spend: SafeToSpendOut
     spending: SpendingOut
+    future: FutureOut
 
 
 class AffordAskIn(BaseModel):

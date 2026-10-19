@@ -5,6 +5,19 @@ import { noSideScroll, refFor, signIn, watchConsole } from "./helpers";
 // GET /today is real (read-only). Preparing and approving are recorded here so the local demo data
 // never changes (a real reminder starts the 7-day cooldown); the backend side is tests/test_today.py.
 
+const reminderAction = (invoice: string, customer: string, status: string, sandbox: object | null) => ({
+  id: 77, proposed_by: "user", tool: "send_reminder", params: { invoice_id: Number(invoice.split(":")[1]), draft_id: 76 },
+  tier: "EXECUTE", status, rationale: "Harbor Lane Café owes you $4,800.00 and is 45 days late on INV-1042.",
+  evidence_ids: [invoice], idempotency_key: "today:1:76", decided_by: null, decided_at: null, result: null,
+  display: {
+    title: "Send a payment reminder to Harbor Lane Café", counterparty: { ref: customer, label: "Harbor Lane Café" },
+    invoice: { ref: invoice, label: "INV-1042" }, amount_cents: 480_000, currency: "USD", invoice_outstanding_cents: 480_000,
+    days_past_due: 45, scheduled_date: null, denied_reason: null, evidence: [{ ref: invoice, label: "INV-1042" }],
+    email: { to_name: "Harbor Lane Café", subject: "Payment overdue: invoice INV-1042 ($4,800.00)", body: "Hello Harbor Lane Café," },
+    sandbox,
+  },
+});
+
 test("sign-in lands on Today: three decisions, safe to spend, where the money went", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
@@ -33,18 +46,7 @@ test("one tap prepares the reminder and opens it for approval", async ({ page })
   await signIn(page, "owner");
   const invoice = await refFor(page, "invoice", "INV-1042");
   const customer = await refFor(page, "counterparty", "Harbor Lane Café");
-  const action = (status: string, sandbox: object | null) => ({
-    id: 77, proposed_by: "user", tool: "send_reminder", params: { invoice_id: Number(invoice.split(":")[1]), draft_id: 76 },
-    tier: "EXECUTE", status, rationale: "Harbor Lane Café owes you $4,800.00 and is 45 days late on INV-1042.",
-    evidence_ids: [invoice], idempotency_key: "today:1:76", decided_by: null, decided_at: null, result: null,
-    display: {
-      title: "Send a payment reminder to Harbor Lane Café", counterparty: { ref: customer, label: "Harbor Lane Café" },
-      invoice: { ref: invoice, label: "INV-1042" }, amount_cents: 480_000, currency: "USD", invoice_outstanding_cents: 480_000,
-      days_past_due: 45, scheduled_date: null, denied_reason: null, evidence: [{ ref: invoice, label: "INV-1042" }],
-      email: { to_name: "Harbor Lane Café", subject: "Payment overdue: invoice INV-1042 ($4,800.00)", body: "Hello Harbor Lane Café," },
-      sandbox,
-    },
-  });
+  const action = (status: string, sandbox: object | null) => reminderAction(invoice, customer, status, sandbox);
   let prepared = 0;
   await page.route("**/api/backend/today/decisions/*/prepare", (route) => {
     prepared += 1;
@@ -130,4 +132,67 @@ test("viewers get no afford box", async ({ page }) => {
   await signIn(page, "viewer");
   await expect(page.getByRole("region", { name: "Decisions" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Can I afford it?" })).toHaveCount(0);
+});
+
+test("watch your future fix itself: the chart, the ghost line, and the curve lifting after an approval", async ({ page }, info) => {
+  const errors = watchConsole(page);
+  await signIn(page, "owner");
+  const invoice = await refFor(page, "invoice", "INV-1042");
+  const customer = await refFor(page, "counterparty", "Harbor Lane Café");
+  let approved = false;
+  // the real GET /today; after the (recorded) approval, the response is what the engine returns once both fixes are sent
+  await page.route("**/api/backend/today", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    if (approved) {
+      const f = body.future;
+      body.future = {
+        ...f, applied: f.pending, pending: [], pending_headline: null,
+        headline: "Cash stays above your cushion for all 13 weeks.", detail: "Lowest week: Nov 26, $1,920.01 above your cushion.",
+        weeks: f.weeks.map((w: { pending_closing_cents: number }) => ({ ...w, closing_cents: w.pending_closing_cents, pending_closing_cents: null, below_cushion: false })),
+      };
+    }
+    return route.fulfill({ response, json: body });
+  });
+  await page.route("**/api/backend/today/decisions/*/prepare", (route) => route.fulfill({ json: reminderAction(invoice, customer, "proposed", null) }));
+  await page.route("**/api/backend/actions/77/approve", (route) => {
+    approved = true;
+    return route.fulfill({ json: reminderAction(invoice, customer, "executed", { kind: "email", id: 9, status: "sent", summary: "Sandbox email #9 sent to Harbor Lane Café", subject: "x", at: "2026-10-01T09:00:00Z" }) });
+  });
+  await page.goto("/today");
+
+  const chart = page.getByRole("region", { name: "Your next 13 weeks" });
+  const headline = chart.getByTestId("future-headline");
+  await expect(headline).toHaveText("Cash stays above your cushion until Nov 5.");
+  const bars = chart.getByTestId("future-bar");
+  await expect(bars).toHaveCount(13);
+  await expect(chart.locator('[data-testid="future-bar"][data-below="true"]')).toHaveCount(7); // weeks 6–10, 12, 13
+  await expect(chart.getByTestId("future-ghost")).toHaveCount(1);
+  await expect(chart).toContainText("Pending fixes (Verde Green Coffee Imports agrees, Harbor Lane Café pays): Cash stays above your cushion for all 13 weeks.");
+  expect(await bars.first().evaluate((el) => getComputedStyle(el).transitionDuration)).toBe("0.7s");
+  await page.screenshot({ path: `e2e/.results/future-before-${info.project.name}.png`, fullPage: true });
+
+  await page.getByRole("button", { name: "Review reminder" }).click();
+  const sheet = page.getByRole("dialog", { name: "Ready for your approval" });
+  const refetched = page.waitForResponse((r) => r.url().endsWith("/api/backend/today") && approved);
+  await sheet.getByRole("button", { name: "Approve and send" }).click();
+  await refetched;
+  await expect(headline).toHaveText("Cash stays above your cushion until Nov 5."); // held while the sheet is open
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(headline).toHaveText("Cash stays above your cushion for all 13 weeks.");
+  await expect(chart.locator('[data-testid="future-bar"][data-below="true"]')).toHaveCount(0);
+  await expect(chart.getByTestId("future-ghost")).toHaveCount(0);
+  await expect(chart).toContainText("Includes the fixes you approved: Verde Green Coffee Imports agrees, Harbor Lane Café pays.");
+  await page.screenshot({ path: `e2e/.results/future-after-${info.project.name}.png`, fullPage: true });
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test("the chart doesn't animate with reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await signIn(page, "viewer");
+  const bar = page.getByRole("region", { name: "Your next 13 weeks" }).getByTestId("future-bar").first();
+  const seconds = await bar.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
+  expect(seconds).toBeLessThan(0.001); // motion-reduce (and the global reduced-motion rule) turn it off
 });

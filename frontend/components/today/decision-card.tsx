@@ -24,10 +24,11 @@ function buttonLabel(d: Decision): string {
 }
 
 /** One decision: a sentence from the engine and one button that opens the prepared action for approval. */
-export function DecisionCard({ decision, role }: { decision: Decision; role: string }) {
+export function DecisionCard({ decision, role, onSheet }: { decision: Decision; role: string; onSheet?: (open: boolean) => void }) {
   const prepare = usePrepare();
   const pending = usePendingActions();
-  const [action, setAction] = useState<Action | null>(null);
+  const [action, setActionState] = useState<Action | null>(null);
+  const setAction = (a: Action | null) => (setActionState(a), onSheet?.(a !== null));
   const insightId = Number(decision.insight.ref.split(":")[1]);
   const canAct = role === "owner" || (role === "accountant" && !OWNER_ONLY.has(decision.kind));
 

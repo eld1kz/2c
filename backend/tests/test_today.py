@@ -9,17 +9,20 @@ from sqlalchemy.orm import Session
 from app.db.models import (
     Action,
     AuditEvent,
+    ForecastLineKind,
     Invoice,
     InvoiceDirection,
     InvoiceStatus,
     SandboxEmail,
 )
 from app.engine import statements as st
-from app.engine.forecast import project
+from app.engine.forecast import CERTAIN_BP, Forecast, Line, build, project
 from app.engine.snapshot import load_snapshot
-from app.engine.today import safe_to_spend, spending
+from app.engine.today import outlook, safe_to_spend, spending
+from app.engine.whatif import run_what_if
 from app.services import today
 from app.services.action_service import Forbidden
+from app.services.demo_reset import reset_demo
 from tests.conftest import ChatHarness, Demo
 
 TODAY = date(2026, 10, 1)
@@ -198,3 +201,76 @@ def test_prepare_over_http(chat: ChatHarness) -> None:
     assert chat.client.post("/today/decisions/999999/prepare", headers=owner).status_code == 404
     assert "today_prepare_forbidden" in chat.events() and "today_prepare_refused" in chat.events()
     assert chat.model.requests == []
+
+
+# --- Watch your future fix itself (the chart) -------------------------------------------------
+
+
+def _future(demo: Demo) -> today.Future:
+    return today.future(demo.session, demo.business.id, TODAY, demo.clock.now)
+
+
+def _approve(demo: Demo, kind: str) -> None:
+    demo.service.approve(demo.users["owner"], _prepare(demo, kind).id)
+
+
+def _closings(f: Forecast | None) -> list[int]:
+    assert f is not None
+    return [w.closing for w in f.weeks]
+
+
+def test_the_chart_starts_on_the_base_forecast(demo: Demo) -> None:
+    f = _future(demo)
+    base = project(load_snapshot(demo.session, demo.business.id, TODAY))
+    assert _closings(f.applied) == _closings(base) and f.applied_fixes == ()
+    assert {d.kind for d in f.pending_fixes} == {"reminder", "terms_request"}  # the price email has no figure
+    now, then = outlook(f.applied), outlook(f.pending)
+    assert (now.headline, now.first_below) == ("Cash stays above your cushion until Nov 5.", date(2026, 11, 5))
+    assert now.detail == "Lowest week: Nov 26, $7,271.99 below your cushion."
+    assert then.headline == "Cash stays above your cushion for all 13 weeks."
+    # the ghost line is the same world as the "if Today's fixes succeed" verdict
+    assert _closings(f.pending) == _closings(run_what_if(base, [s for _, s in today.fixes(
+        demo.session, demo.business.id, TODAY)]).scenario)
+
+
+def test_each_approved_fix_lifts_the_curve_and_a_reset_restores_it(demo: Demo) -> None:
+    base = _closings(_future(demo).applied)
+    _approve(demo, "reminder")
+    one = _future(demo)
+    assert [d.kind for d in one.applied_fixes] == ["reminder"] and [d.kind for d in one.pending_fixes] == ["terms_request"]
+    assert [a - b for a, b in zip(_closings(one.applied), base)] == [480_000] * 13  # INV-1042 collected now
+    assert outlook(one.applied).headline == "Cash stays above your cushion until Nov 5."  # still short, by less
+    assert outlook(one.applied).detail == "Lowest week: Nov 26, $2,471.99 below your cushion."
+    _approve(demo, "terms_request")
+    both = _future(demo)
+    assert both.pending is None and both.pending_fixes == ()
+    assert not any(w.below_buffer for w in both.applied.weeks)
+    assert outlook(both.applied).headline == "Cash stays above your cushion for all 13 weeks."
+    reset_demo(demo.session, demo.business.id, "cli:demo_reset", TODAY)
+    after = _future(demo)  # the actions are gone, so the chart is the (reloaded) base forecast again
+    assert after.applied_fixes == () and len(after.pending_fixes) == 2
+    assert _closings(after.applied) == _closings(project(load_snapshot(demo.session, demo.business.id, TODAY)))
+
+
+def test_outlook_wording() -> None:
+    def forecast(*closings: int) -> Forecast:
+        lines = [Line(TODAY, ForecastLineKind.opening, closings[0], CERTAIN_BP, ("account:1",))]
+        lines += [Line(TODAY + timedelta(days=7 * i), ForecastLineKind.baseline_in, c - p, CERTAIN_BP, ("transaction:1",))
+                  for i, (p, c) in enumerate(zip(closings, closings[1:]), start=1)]
+        return build(TODAY, "USD", 500_000, lines, {})
+
+    assert outlook(forecast(*[600_000] * 13)).detail == "Lowest week: Oct 1, $1,000.00 above your cushion."
+    assert outlook(forecast(400_000, *[600_000] * 12)).headline == "Cash is below your cushion this week."
+    later = outlook(forecast(*[600_000] * 9, 450_000, *[600_000] * 3))
+    assert (later.headline, later.lowest_week) == ("Cash stays above your cushion until Dec 3.", 10)
+
+
+def test_today_sends_the_chart_to_every_role(chat: ChatHarness) -> None:
+    for role in ("owner", "viewer"):
+        f = chat.client.get("/today", headers=chat.login(role)).json()["future"]
+        assert len(f["weeks"]) == 13 and f["cushion_cents"] == 500_000 and f["applied"] == []
+        assert f["headline"] == "Cash stays above your cushion until Nov 5."
+        assert f["pending_headline"] == "Cash stays above your cushion for all 13 weeks."
+        assert [w["below_cushion"] for w in f["weeks"]][5:10] == [True] * 5
+        assert all(w["pending_closing_cents"] >= 500_000 for w in f["weeks"])
+        assert {x["kind"] for x in f["pending"]} == {"reminder", "terms_request"}

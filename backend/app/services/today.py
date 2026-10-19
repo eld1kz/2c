@@ -114,6 +114,28 @@ def fixes(session: Session, business_id: int, today: date) -> list[tuple[Decisio
     return out
 
 
+@dataclass(frozen=True)
+class Future:
+    """Today's chart: the forecast with every fix already approved (sent), and with the rest too."""
+    applied: Forecast
+    pending: Forecast | None  # applied + the fixes not sent yet; None when none remain
+    applied_fixes: tuple[Decision, ...]
+    pending_fixes: tuple[Decision, ...]
+
+
+def future(session: Session, business_id: int, today: date, now: datetime) -> Future:
+    """A fix counts as applied once its email went out (the decision shows "Sent"); its what-if is the
+    same one the "with fixes" verdict uses (`fixes`). A demo reset clears the actions, so the chart
+    goes back to the base forecast."""
+    base = project(load_snapshot(session, business_id, today))
+    done, todo = [], []
+    for d, s in fixes(session, business_id, today):
+        (done if sent_for(session, business_id, d, now) is not None else todo).append((d, s))
+    applied = run_what_if(base, [s for _, s in done]).scenario if done else base
+    pending = run_what_if(applied, [s for _, s in todo]).scenario if todo else None
+    return Future(applied, pending, tuple(d for d, _ in done), tuple(d for d, _ in todo))
+
+
 def _targets(action: Action, target: dict[str, int]) -> bool:
     return all((action.params or {}).get(k) == v for k, v in target.items())
 

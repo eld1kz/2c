@@ -139,6 +139,12 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 - `frontend/e2e/today.spec.ts`: a chip asks; both verdict lines, cited sentence and chart render; viewers get no box.
 - Oct 19: the raise chip is 3% (a 5% raise misses the cushion by $34.52 in week 9 on the golden data even with the fixes), so one chip answers Yes once Today's fixes succeed. Code freeze after this: bug fixes only.
 
+**6c-3 (Oct 19, freeze lifted for this feature only): "Watch your future fix itself".** A 13-week cash chart on Today with every approved fix applied (same engine what-ifs as the "with fixes" verdict), an engine headline, a dashed ghost line for the pending fixes, the curve animating after an approval, reduced motion respected, and a demo reset restoring the base curve.
+
+**Acceptance (6c-3)**
+- `backend/tests/test_today.py`: the chart starts on the base forecast and its ghost line equals the "with fixes" world; each approved fix lifts the curve (INV-1042 +$4,800 every week, then both fixes → no week below the cushion); a reset restores the base curve; headline wording; `GET /today` sends it to every role.
+- `frontend/e2e/today.spec.ts`: chart, ghost line and headline; after an approval the headline and bars change once the sheet closes; no transition with reduced motion.
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 
 **Oct 19: deployment skipped for the submission.** The product runs locally: Postgres in Docker Compose, with the API and the web app on the host (README → Run it locally; checked from a fresh clone and an empty database). The production stack (`deploy/`, `scripts/deploy.sh`, `scripts/check_deploy.sh`, `scripts/fetch_evidence.sh`, the cron reset) stays in the repository, tested and ready to deploy. The committed evidence export comes from the local stack: live P1 (ends with a reset), then live P4 with `KEEP_STATE=1`, then `evidence_export`, `--verify-anchor` and `--check-file` (README → Execution evidence).
