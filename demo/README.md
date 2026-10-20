@@ -18,6 +18,8 @@ resets again at the end, so the browser tests still find the golden state. It wr
 `demo/out/ledgerwise-demo.webm` and `.mp4` (git-ignored, about 2 minutes). The chat scene makes one
 real model call (needs `ANTHROPIC_API_KEY`); the Import scene syncs the Plaid sandbox feed (needs
 `PLAID_CLIENT_ID` and `PLAID_SECRET`). A missing key fails that scene.
+**Plaid sync changes the demo data — run Reset demo data afterwards.** `record.sh` already resets at the end; after a manual sync, press "Reset demo data"
+(or `cd backend && python -m seed.reset`) before recording or running the browser tests.
 Extra arguments go to `shot-scraper video`, e.g. `demo/record.sh --timeout 180000`.
 
 ## Edit
@@ -27,6 +29,8 @@ Each scene is a list of `click` / `wait_for` / `scroll` / `pause` steps with Pla
 
 ## Exploring with Playwright MCP
 
-`.mcp.json` registers Playwright MCP with `--caps devtools`, which adds `browser_start_video`,
+`.mcp.json` is git-ignored (the launcher differs per OS). To use Playwright MCP, create it locally
+with `npx -y @playwright/mcp@0.0.83 --browser chromium --caps devtools --output-dir demo/out/mcp`
+(on Windows wrap the command in `cmd /c`). `--caps devtools` adds `browser_start_video`,
 `browser_video_chapter` (title cards) and `browser_video_show_actions` (cursor and action callouts).
 Use it to find selectors or record a one-off clip interactively; videos land in `demo/out/mcp/`.

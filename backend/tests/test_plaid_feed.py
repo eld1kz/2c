@@ -1,6 +1,7 @@
 """Plaid sandbox bank feed: conversion, client and POST /bank-feed/plaid/sync (no network)."""
 
 import json
+from datetime import date
 from collections.abc import Iterator
 from decimal import Decimal
 from typing import Any
@@ -14,7 +15,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_classifier, get_session
 from app.api.routes_bankfeed import get_plaid_client
-from app.db.models import Action, AuditEvent, Base, Counterparty, Transaction
+from app.db.models import Account, Action, AuditEvent, Base, Counterparty, Transaction
+from app.engine import statements as st
+from app.engine.forecast import project
+from app.engine.snapshot import load_snapshot
+from app.engine.today import safe_to_spend
 from app.ingestion.plaid_feed import (
     PLAID_SANDBOX_URL,
     PlaidError,
@@ -26,6 +31,8 @@ from app.ingestion.plaid_feed import (
 from app.main import app
 from seed.load import DEMO_PASSWORD, load
 from tests.fakes import FakeClassifier
+
+DEMO_TODAY = date(2026, 10, 1)
 
 
 def _plaid_txns(feed: dict[str, Any]) -> list[dict[str, Any]]:
@@ -190,3 +197,27 @@ def test_plaid_check_script_passes_on_the_feed(capsys: pytest.CaptureFixture[str
     out = capsys.readouterr().out
     assert "PASS" in out and "'inserted': 5" in out and "'skipped_duplicates': 9" in out
     assert main([], client=FakePlaid(fail="INVALID_API_KEYS")) == 1  # type: ignore[arg-type]
+
+
+def _cash_and_september(db: sessionmaker) -> tuple[int, int]:
+    """Cash now and September's reconciliation difference (books vs the bank statement balance)."""
+    with db() as s:
+        business_id = s.scalar(select(Account.business_id))
+        snap = load_snapshot(s, business_id, DEMO_TODAY)
+        close = st.month_close(snap, st.load_account_ledgers(s, business_id, DEMO_TODAY))
+        (account,) = close.reconciliation.accounts
+        return safe_to_spend(snap, project(snap)).cash, account.difference
+
+
+def test_reset_demo_data_removes_every_synced_row(db: sessionmaker) -> None:
+    """Plaid sync changes the demo data; "Reset demo data" brings it back: cash $8,650.00, September reconciles."""
+    client = TestClient(app)
+    owner = _login(client, "owner")
+    assert _cash_and_september(db) == (865_000, 0)
+    assert client.post("/bank-feed/plaid/sync", headers=owner).json()["inserted"] == 5
+    assert _cash_and_september(db) == (910_055, -45_055)  # the synced rows aren't on the bank statement
+
+    assert client.post("/demo/reset", headers=owner).status_code == 200
+    with db() as s:
+        assert s.scalar(select(func.count(Transaction.id)).where(Transaction.source_file.like("plaid%"))) == 0
+    assert _cash_and_september(db) == (865_000, 0)

@@ -8,3 +8,4 @@ node_modules/
 .DS_Store
 .claude/launch.json
 demo/out/
+.mcp.json
