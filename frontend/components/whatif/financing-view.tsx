@@ -105,7 +105,7 @@ export function FinancingView({ scenarios, ask }: { scenarios: ScenarioInput[]; 
         </h2>
         {f?.gap && (
           <p className="mt-1 text-sm text-ink-2">
-            Gap: <span className="num font-semibold text-ink">{formatCents(f.gap.amount_cents, f.currency)}</span> below the buffer at the lowest
+            Gap: <span className="num font-semibold text-ink">{formatCents(f.gap.amount_cents, f.currency)}</span> below your cushion at the lowest
             point (week {f.gap.low_week}); below it in {weekList(f.gap.weeks_below)}.
           </p>
         )}
@@ -116,7 +116,7 @@ export function FinancingView({ scenarios, ask }: { scenarios: ScenarioInput[]; 
         </p>
       )}
       {!f && !result.isError && <Skeleton className="h-64" />}
-      {f && !f.gap && <p className="text-sm font-medium text-good-ink">No week falls below the buffer, so there is no gap to finance.</p>}
+      {f && !f.gap && <p className="text-sm font-medium text-good-ink">No week falls below your cushion, so there is no gap to cover.</p>}
       {f?.gap && (
         <>
           <ol className="space-y-3">

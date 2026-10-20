@@ -92,7 +92,7 @@ export function FutureChart({ future, currency, hold }: { future: Future; curren
           </li>
         )}
       </ul>
-      <p className="mt-2 flex items-center gap-1 text-[11px] text-ink-3">From your forecast, assuming approved fixes work out. Nothing is sent until you approve it. <Help term="forecast" /></p>
+      <p className="mt-2 flex items-center gap-1 text-[11px] text-ink-3">Assumes the fixes you approve work out. <Help term="forecast" /></p>
     </section>
   );
 }

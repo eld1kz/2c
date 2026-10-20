@@ -17,7 +17,7 @@ export function InsightsView() {
   const rows = (data ?? []).filter((i) => severity === "all" || i.severity === severity);
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-xl font-semibold tracking-tight">Insights</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Findings</h1>
       <p className="mt-1 text-sm text-ink-3">
         Problems and savings the engine found in your records, largest first. Each amount is computed from the linked records, not by the AI.
       </p>
@@ -36,7 +36,7 @@ export function InsightsView() {
       </div>
       <div className="mt-3 divide-y divide-line border-t border-line">
         {isLoading && <Skeleton className="my-4 h-40" />}
-        {isError && <p className="py-4 text-sm text-risk-ink">Insights couldn&apos;t be loaded. Refresh to try again.</p>}
+        {isError && <p className="py-4 text-sm text-risk-ink">Findings couldn&apos;t be loaded. Refresh to try again.</p>}
         {rows.map((i) => (
           <InsightCard key={i.id} insight={i} action={<InsightActions insight={i} />} />
         ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ClockIcon, MessageSquarePlusIcon, SparklesIcon, XIcon } from "lucide-react";
+import { ClockIcon, MessageSquarePlusIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,11 @@ export function ChatNotice({ notice, onDismiss, onNewConversation }: { notice: N
     return (
       <div role="status" className="rounded-xl border border-attn/40 bg-attn-soft px-4 py-3 text-sm text-attn-ink">
         <p className="flex items-center gap-2 font-medium">
-          <SparklesIcon className="size-4" /> Today&apos;s AI budget is used up
+          Today&apos;s AI budget is used up
         </p>
         <p className="mt-1 text-ink-2">
           The assistant is back after 00:00 UTC{notice.retryAfter ? `, in ${formatDuration(notice.retryAfter)}` : ""}. The forecast,
-          insights and approvals keep working: they don&apos;t use AI.
+          findings and approvals keep working: they don&apos;t use AI.
         </p>
       </div>
     );

@@ -38,7 +38,7 @@ test("live P4: cash gap → what-if → leftover financing → reminder + terms 
   await shot(page, "1-dashboard");
   await gapCard.getByRole("link", { name: "What if Harbor Lane Café pays INV-1042?" }).click();
   await expect(page.getByRole("region", { name: "Assumption, not a recorded fact" })).toContainText("$4,800.00");
-  await expect(page.getByTestId("whatif-summary")).toContainText("If the assumption holds$2,381.99 short of the buffer");
+  await expect(page.getByTestId("whatif-summary")).toContainText("If the assumption holds$2,381.99 short of your cushion");
   await shot(page, "2-whatif");
 
   // 2. one click to the financing ranking for the gap that is left

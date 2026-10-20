@@ -8,7 +8,7 @@ const STEP: Record<string, string> = {
   get_cash_position: "Checked cash",
   get_ledger: "Searched the ledger",
   get_forecast: "Read the forecast",
-  get_insights: "Reviewed insights",
+  get_insights: "Checked the findings",
   explain_record: "Opened a record",
   run_what_if: "Ran a what-if",
   rank_financing: "Compared financing",

@@ -30,7 +30,7 @@ export function MonthCloseView() {
       <Panel id="pnl-title" term="profit_and_loss" title="Profit and loss" subtitle={`${period.label}, cash basis, ${data.profit_and_loss.transaction_count} transactions`}>
         <StatementTable columns={[period.label]} rows={pnlRows([data.profit_and_loss])} currency={currency} label="Profit and loss" />
       </Panel>
-      <Panel id="ar-title" term="receivable" title="Money customers owe you" subtitle="Receivables aging: open invoices by how late they are">
+      <Panel id="ar-title" term="receivable" title="Who owes you" subtitle="Open customer invoices, by how late they are">
         <AgingTable aging={data.receivables} currency={currency} label="Receivables" />
       </Panel>
       <Panel id="ap-title" term="payable" title="Bills you owe" subtitle="Payables aging: open supplier bills by how late they are">

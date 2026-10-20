@@ -18,8 +18,8 @@ test("cash-gap card → what-if: before/after, with the scenario shown as an ass
   await expect(assumption).toContainText("Harbor Lane Café pays INV-1042 in full: $4,800.00");
   await expect(assumption).toContainText("Nothing in your books was changed");
   const summary = page.getByTestId("whatif-summary");
-  await expect(summary).toContainText("Today's forecast$7,181.99 short of the buffer"); // today's gap
-  await expect(summary).toContainText("If the assumption holds$2,381.99 short of the buffer"); // the gap left if it is paid
+  await expect(summary).toContainText("Today's forecast$7,181.99 short of your cushion"); // today's gap
+  await expect(summary).toContainText("If the assumption holds$2,381.99 short of your cushion"); // the gap left if it is paid
   await expect(page.getByRole("region", { name: "Closing cash by week, before and after" }).locator(".recharts-bar-rectangle").first()).toBeVisible();
   await page.screenshot({ path: `e2e/.results/whatif-${info.project.name}.png`, fullPage: true });
   expect(await noSideScroll(page)).toBeLessThanOrEqual(0);

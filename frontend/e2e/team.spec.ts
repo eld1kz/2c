@@ -79,11 +79,10 @@ test("viewers see names and roles but no pay and no buttons", async ({ page }) =
   await expect(page.getByRole("region", { name: "Hire someone" })).toHaveCount(0);
 });
 
-test("Team is under More", async ({ page }, info) => {
+test("Team is in the main navigation", async ({ page }, info) => {
   await signIn(page, "owner");
   if (info.project.name === "phone") {
-    await page.getByRole("navigation", { name: "Main" }).last().getByRole("button", { name: "More", exact: true }).click();
-    await expect(page.getByRole("navigation", { name: "More" }).getByRole("link", { name: "Team" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Main" }).last().getByRole("link", { name: "Team" })).toBeVisible();
   } else {
     await expect(page.getByRole("navigation", { name: "Main" }).first().getByRole("link", { name: "Team" })).toBeVisible();
   }

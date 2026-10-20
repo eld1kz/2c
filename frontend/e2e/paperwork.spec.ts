@@ -13,7 +13,7 @@ test("close my month: September reconciles and every report renders", async ({ p
   await expect(page.getByRole("heading", { name: "Paperwork", level: 1 })).toBeVisible();
   await expect(page.getByTestId("disclaimer")).toHaveText(DISCLAIMER);
   await expect(page.getByText("Cash basis", { exact: false }).first()).toBeVisible();
-  for (const title of ["Bank reconciliation", "Cash-flow statement", "Profit and loss", "Money customers owe you", "Bills you owe"]) {
+  for (const title of ["Bank reconciliation", "Cash-flow statement", "Profit and loss", "Who owes you", "Bills you owe"]) {
     await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
   }
   await expect(page.getByText("It matches your books to the cent.")).toBeVisible();

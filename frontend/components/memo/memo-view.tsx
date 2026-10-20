@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlertIcon, LoaderCircleIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
+import { CircleAlertIcon, LoaderCircleIcon, PenLineIcon, RefreshCwIcon } from "lucide-react";
 
 import { Answer } from "@/components/chat/answer";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ export function MemoView() {
 
   const button = canWrite && (
     <Button variant={shown ? "secondary" : "primary"} size={shown ? "sm" : "lg"} disabled={writing} onClick={() => generate.mutate()}>
-      {writing ? <LoaderCircleIcon className="animate-spin" /> : shown ? <RefreshCwIcon /> : <SparklesIcon />}
+      {writing ? <LoaderCircleIcon className="animate-spin" /> : shown ? <RefreshCwIcon /> : <PenLineIcon />}
       {writing ? "Writing the memo…" : shown ? "Write it again" : "Write this week's memo"}
     </Button>
   );

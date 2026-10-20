@@ -14,10 +14,10 @@ function GapLine({ label, gap, currency, emphasis, term }: { label: string; gap:
         {gap ? (
           <>
             <span className={`num font-semibold ${emphasis ? "text-risk-ink" : ""}`}>{formatCents(gap.amount_cents, currency)}</span> short of
-            the buffer at the lowest point (week {gap.low_week}); below it in {weekList(gap.weeks_below)}.
+            your cushion at the lowest point (week {gap.low_week}); below it in {weekList(gap.weeks_below)}.
           </>
         ) : (
-          <span className="font-semibold text-good-ink">Cash stays above the buffer in every week.</span>
+          <span className="font-semibold text-good-ink">Cash stays above your cushion every week.</span>
         )}
       </dd>
     </div>

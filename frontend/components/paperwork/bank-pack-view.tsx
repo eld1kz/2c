@@ -43,7 +43,7 @@ export function BankPackView() {
       <Panel id="pack-cf" term="cash_flow_statement" title="Cash-flow statement" subtitle={`Last ${data.months.length} months`}>
         <StatementTable columns={columns} rows={cashFlowRows(data.cash_flow)} currency={currency} label="Cash flow, by month" />
       </Panel>
-      <Panel id="pack-fc" term="forecast" title="13-week cash forecast" subtitle={`Weekly closing cash; minimum buffer ${formatCents(data.min_cash_buffer_cents, currency)}`}>
+      <Panel id="pack-fc" term="forecast" title="13-week cash forecast" subtitle={`Weekly closing cash; cushion ${formatCents(data.min_cash_buffer_cents, currency)}`}>
         <ForecastTable weeks={data.forecast} currency={currency} onSelectWeek={(w) => evidence?.open(`forecast_week:${w}`)} />
       </Panel>
       <Panel

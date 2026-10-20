@@ -8,7 +8,7 @@ import { useEvidence } from "@/components/evidence/evidence-provider";
 import { AskLink } from "@/components/chat/ask-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompareFinancingLink } from "@/components/whatif/whatif-links";
-import { useForecast, useInsights } from "@/lib/api/hooks";
+import { useForecast, useInsights, useToday } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
 import { formatCents } from "@/lib/money";
 
@@ -18,6 +18,8 @@ import { ForecastTable } from "./forecast-table";
 import { InsightActions } from "./insight-actions";
 import { InsightCard } from "./insight-card";
 import { SideRail } from "./side-rail";
+import { MoneyGoes } from "@/components/today/money-goes";
+import { SafeToSpend } from "@/components/today/safe-to-spend";
 
 const TOP_INSIGHTS = 3;
 
@@ -25,10 +27,10 @@ function Legend({ buffer, currency }: { buffer: number; currency: string }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
       <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm bg-good" aria-hidden /> Above buffer
+        <span className="size-2.5 rounded-sm bg-good" aria-hidden /> Above your cushion
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm bg-risk" aria-hidden /> Below buffer
+        <span className="size-2.5 rounded-sm bg-risk" aria-hidden /> Below your cushion
       </li>
       <li className="flex items-center gap-1.5">
         <span className="w-4 border-t-2 border-dashed border-ink-2" aria-hidden /> {formatCents(buffer, currency, { dropZeroCents: true })} minimum buffer
@@ -40,6 +42,7 @@ function Legend({ buffer, currency }: { buffer: number; currency: string }) {
 export function DashboardView() {
   const forecast = useForecast();
   const insights = useInsights();
+  const today = useToday();
   const evidence = useEvidence();
   const setWeek = (week: number) => evidence?.open(`forecast_week:${week}`);
   const [asTable, setAsTable] = useState(false);
@@ -101,6 +104,13 @@ export function DashboardView() {
         <p className="mt-2 text-xs text-ink-3">Select a week to see each payment behind it and the records it comes from.</p>
       </section>
 
+      {today.data && (
+        <div className="space-y-4 lg:col-start-1">
+          <SafeToSpend safe={today.data.safe_to_spend} currency={today.data.currency} />
+          <MoneyGoes spending={today.data.spending} currency={today.data.currency} />
+        </div>
+      )}
+
       <section className="lg:col-start-1" aria-labelledby="insights-title">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="insights-title" className="text-[15px] font-semibold">
@@ -108,7 +118,7 @@ export function DashboardView() {
           </h2>
           {insights.data && insights.data.length > TOP_INSIGHTS && (
             <Link href="/insights" className="text-sm font-medium text-brand-ink hover:underline">
-              See all {insights.data.length} insights
+              See all {insights.data.length} findings
             </Link>
           )}
         </div>

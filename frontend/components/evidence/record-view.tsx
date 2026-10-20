@@ -16,7 +16,7 @@ const KIND: Record<string, string> = {
   counterparty: "Customer or supplier",
   recurring_series: "Recurring payment",
   account: "Bank account",
-  insight: "Insight",
+  insight: "Finding",
   action: "Proposed action",
 };
 

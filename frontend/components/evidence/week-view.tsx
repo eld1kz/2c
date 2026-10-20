@@ -18,7 +18,7 @@ export function WeekSheetContent({ week, onBack }: { week: number; onBack?: () =
     <SheetContent
       onBack={onBack}
       title={w ? `Week ${w.week}, ${formatDay(w.start)} to ${formatDay(w.end)}` : `Week ${week}`}
-      description={w ? (w.below_buffer ? "Closes below the buffer" : "Closes above the buffer") : undefined}
+      description={w ? (w.below_buffer ? "Closes below your cushion" : "Closes above your cushion") : undefined}
     >
       {isLoading && <Skeleton className="h-40" />}
       {isError && <p className="text-sm text-risk-ink">This week couldn&apos;t be loaded. Close the panel and try again.</p>}

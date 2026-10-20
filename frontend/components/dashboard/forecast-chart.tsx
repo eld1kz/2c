@@ -47,7 +47,7 @@ function WeekTooltip({ active, payload, currency }: TooltipContentProps & { curr
         </dd>
       </dl>
       <p className={`mt-2 font-medium ${row.below_buffer ? "text-risk-ink" : "text-good-ink"}`}>
-        {row.below_buffer ? "Below buffer" : "Above buffer"}
+        {row.below_buffer ? "Below your cushion" : "Above your cushion"}
       </p>
       <p className="mt-1 text-ink-3">Select the bar to see every line.</p>
     </div>

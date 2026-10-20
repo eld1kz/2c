@@ -41,7 +41,7 @@ export function ResetDemo({ className, onDone }: { className?: string; onDone?: 
         <AlertDialog.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-panel)] bg-surface p-5 shadow-xl">
           <AlertDialog.Title className="text-base font-semibold">Reset the demo data?</AlertDialog.Title>
           <AlertDialog.Description className="mt-2 text-sm leading-relaxed text-ink-2">
-            Transactions, invoices, insights, the forecast, approvals, sandbox emails and payments, and chat conversations go back to how the demo
+            Transactions, invoices, findings, the forecast, approvals, sandbox emails and payments, and chat conversations go back to how the demo
             started. The audit log is kept as it is and records this reset.
           </AlertDialog.Description>
           <div className="mt-5 flex justify-end gap-2">

@@ -13,7 +13,7 @@ import { EvidenceProvider } from "@/components/evidence/evidence-provider";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { BudgetMeter } from "./budget-meter";
-import { NAV, type NavItem } from "./nav-items";
+import { GROUPS, NAV, type NavItem } from "./nav-items";
 import { ResetDemo } from "./reset-demo";
 
 async function signOut() {
@@ -94,9 +94,14 @@ function MoreMenu() {
       </button>
       <SheetContent title="More">
         <nav className="-mx-2 flex flex-col gap-0.5" aria-label="More">
-          {NAV.filter((item) => item.more).map((item) => (
-            <div key={item.href} onClick={() => setOpen(false)}>
-              <NavLink item={item} />
+          {GROUPS.map((g) => (
+            <div key={g} role="group" aria-label={g} className="mb-2">
+              <p className="px-3 pt-1 pb-0.5 text-xs font-medium text-ink-3">{g}</p>
+              {NAV.filter((item) => item.more === g).map((item) => (
+                <div key={item.href} onClick={() => setOpen(false)}>
+                  <NavLink item={item} />
+                </div>
+              ))}
             </div>
           ))}
           <ResetDemo onDone={() => setOpen(false)} />
@@ -125,9 +130,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {NAV.filter((item) => !item.more).map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
-            <p className="mt-5 mb-1 px-3 text-xs font-medium text-ink-3">More</p>
-            {NAV.filter((item) => item.more).map((item) => (
-              <NavLink key={item.href} item={item} />
+            <p className="mt-5 px-3 text-xs font-semibold text-ink-2">More</p>
+            {GROUPS.map((g) => (
+              <div key={g} role="group" aria-label={g}>
+                <p className="mt-2 mb-0.5 px-3 text-xs text-ink-3">{g}</p>
+                {NAV.filter((item) => item.more === g).map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </div>
             ))}
           </nav>
           <div className="mt-auto space-y-4 px-3">

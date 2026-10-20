@@ -290,7 +290,7 @@ Fictional vendor names only (no real brands).
 ---
 
 ## 10. Frontend pages
-- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went, and (owner/accountant) a "Can I afford it?" box with three example chips (a hire, a 3% raise, an espresso machine). Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · More (Overview, Insights, What-if, Paperwork, CFO memo, Transactions, Import, Audit log)
+- `/today` — the home screen after sign-in (§6.9): greeting, up to 3 decisions with one button each that opens the prepared action on its approval card, safe to spend this week (tappable breakdown with evidence), where last month's money went, and (owner/accountant) a "Can I afford it?" box with three example chips (a hire, a 3% raise, an espresso machine). Plain words: "who owes you", "bills", "your cushion". Navigation: Today · Ask · Approvals · Team · More, with More grouped as Money (Overview, Findings, What-if, Paperwork, CFO memo), Records (Transactions, Import) and Safety (Audit log, Trust). Today shows only the greeting, the 13-week chart, up to 3 decisions, Can I afford it and the team row; safe to spend and last month's spending are on Overview. Words used everywhere: "cushion" (never "buffer"), "bills", "who owes you"
 - `/dashboard` — cash now, 13-week chart with buffer line, top 3 insights, pending approvals count
 - `/transactions` — table + review queue
 - `/insights` — cards with impact, evidence chips, "Ask the CFO" button

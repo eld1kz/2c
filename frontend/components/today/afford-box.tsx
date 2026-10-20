@@ -12,7 +12,6 @@ import { useAfford, useWhatIf } from "@/lib/api/hooks";
 import type { components } from "@/lib/api/schema";
 import { formatCents, formatDay } from "@/lib/money";
 import { whatIfHref, type ScenarioInput } from "@/lib/scenarios";
-import { Help } from "@/components/glossary/help";
 
 const EXAMPLES = ["Hire a barista at $2,500/month from November?", "Give staff a 3% raise?", "Buy a $3,000 espresso machine?"];
 
@@ -92,11 +91,7 @@ function Verdicts({ r }: { r: Afford }) {
           </Button>
         )}
       </section>
-      <p className="text-xs text-ink-3">
-        From your 13-week forecast <Help term="forecast" />. Safe means no week ends below your cushion <Help term="cushion" />.
-        {fixed && " The fixes line assumes the actions prepared on Today work out; nothing is sent until you approve it."}
-      </p>
-      <p className="text-[13px] font-medium text-ink-2">This is advice. You decide.</p>
+      <p className="text-xs text-ink-3">Safe means every week ends above your cushion. This is advice. You decide.</p>
     </div>
   );
 }

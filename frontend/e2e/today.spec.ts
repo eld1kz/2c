@@ -18,11 +18,10 @@ const reminderAction = (invoice: string, customer: string, status: string, sandb
   },
 });
 
-test("sign-in lands on Today: three decisions, safe to spend, where the money went", async ({ page }, info) => {
+test("sign-in lands on Today: the chart, three decisions, afford, the team; nothing else", async ({ page }, info) => {
   const errors = watchConsole(page);
   await signIn(page, "owner");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Demo Owner\.$/);
-  await expect(page.getByText("Here's your money today.")).toBeVisible();
   const decisions = page.getByRole("region", { name: "Decisions" }).getByRole("article");
   await expect(decisions).toHaveCount(3);
   await expect(decisions.nth(0)).toContainText("Verde Green Coffee Imports raised GRN-COL-HUILA by 18%");
@@ -30,14 +29,23 @@ test("sign-in lands on Today: three decisions, safe to spend, where the money we
   await expect(decisions.nth(1).getByRole("button", { name: "Ask Verde Green Coffee Imports for 30 more days" })).toBeVisible();
   await expect(decisions.nth(2)).toContainText("Harbor Lane Café owes you $4,800.00 and is 45 days late on INV-1042.");
 
+  await expect(page.getByRole("heading", { name: "3 things to decide" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your next 13 weeks" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Can I afford it?" })).toBeVisible();
+  await expect(page.getByTestId("team-line")).toBeVisible();
+  // safe to spend and last month's spending moved to Overview
+  await expect(page.getByRole("heading", { name: /safe to spend/ })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /Where your money went/ })).toHaveCount(0);
+  await expect(page.locator("main").getByRole("button", { name: /^What is this\?/ })).toHaveCount(4); // the key terms only
+
+  await page.screenshot({ path: `e2e/.results/today-${info.project.name}.png`, fullPage: true });
+  await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Nothing is safe to spend this week" })).toBeVisible();
   await expect(page.getByText("This week's bills would take you $5,292.54 below your cushion.")).toBeVisible();
   await page.getByRole("button", { name: /Nothing is safe to spend/ }).click();
   await expect(page.getByText("Your cushion (money you keep for surprises)")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Where your money went in September" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open the full profit and loss" })).toHaveAttribute("href", "/paperwork");
-
-  await page.screenshot({ path: `e2e/.results/today-${info.project.name}.png`, fullPage: true });
   expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
   expect(errors).toEqual([]);
 });
@@ -79,20 +87,22 @@ test("viewer sees the decisions but no buttons", async ({ page }) => {
   await expect(decisions.first()).toContainText("The owner or accountant decides this.");
 });
 
-test("navigation is Today, Ask, Approvals and More", async ({ page }, info) => {
+test("navigation is Today, Ask, Approvals, Team and a grouped More", async ({ page }, info) => {
   await signIn(page, "owner");
+  const groups = { Money: ["Overview", "Findings", "What-if", "Paperwork", "CFO memo"], Records: ["Transactions", "Import"], Safety: ["Audit log", "Trust"] };
+  let nav;
   if (info.project.name === "phone") {
     const bar = page.getByRole("navigation", { name: "Main" }).last();
-    await expect(bar.getByRole("link")).toHaveText(["Today", "Ask", "Approvals"]);
+    await expect(bar.getByRole("link")).toHaveText(["Today", "Ask", "Approvals", "Team"]);
     await bar.getByRole("button", { name: "More", exact: true }).click();
-    const more = page.getByRole("navigation", { name: "More" });
-    for (const label of ["Overview", "Insights", "What-if", "Paperwork", "CFO memo", "Transactions", "Import", "Audit log"]) {
-      await expect(more.getByRole("link", { name: label })).toBeVisible();
-    }
+    nav = page.getByRole("navigation", { name: "More" });
   } else {
-    const side = page.getByRole("navigation", { name: "Main" }).first();
-    await expect(side.getByRole("link").first()).toHaveText("Today");
-    await expect(side.getByText("More", { exact: true })).toBeVisible();
+    nav = page.getByRole("navigation", { name: "Main" }).first();
+    await expect(nav.getByRole("link").first()).toHaveText("Today");
+    await expect(nav.getByText("More", { exact: true })).toBeVisible();
+  }
+  for (const [group, labels] of Object.entries(groups)) {
+    await expect(nav.getByRole("group", { name: group }).getByRole("link")).toHaveText(labels);
   }
 });
 

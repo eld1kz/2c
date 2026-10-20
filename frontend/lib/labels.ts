@@ -3,11 +3,11 @@ import type { Schemas } from "@/lib/api/client";
 // Plain-language names for engine enums.
 
 export const INSIGHT_TYPE: Record<string, string> = {
-  LATE_PAYER: "Late payer",
-  DUPLICATE_SUBSCRIPTION: "Duplicate subscription",
-  PRICE_CREEP: "Supplier price rise",
-  CASH_GAP: "Cash gap",
-  UNUSUAL_EXPENSE: "Unusual expense",
+  LATE_PAYER: "Paying late",
+  DUPLICATE_SUBSCRIPTION: "Paying twice",
+  PRICE_CREEP: "Price went up",
+  CASH_GAP: "Cash runs short",
+  UNUSUAL_EXPENSE: "Unusual cost",
 };
 
 export const SEVERITY: Record<string, string> = { high: "High", med: "Medium", low: "Low" };

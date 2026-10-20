@@ -78,7 +78,7 @@ export function WhatIfLegend({ buffer, currency }: { buffer: number; currency: s
           <span className="size-2.5 rounded-l-sm bg-good" />
           <span className="size-2.5 rounded-r-sm bg-risk" />
         </span>
-        If the assumption holds (red: below buffer)
+        If the assumption holds (red: below your cushion)
       </li>
       <li className="flex items-center gap-1.5">
         <span className="w-4 border-t-2 border-dashed border-ink-2" aria-hidden /> {formatCents(buffer, currency, { dropZeroCents: true })} minimum buffer

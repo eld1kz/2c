@@ -1,6 +1,5 @@
 "use client";
 
-import { SparklesIcon } from "lucide-react";
 
 import { useBudget } from "@/lib/api/hooks";
 import { cn } from "@/lib/cn";
@@ -19,7 +18,6 @@ export function BudgetMeter({ className }: { className?: string }) {
     <div className={cn("text-xs", className)}>
       <div className="flex items-center justify-between gap-2 text-ink-2">
         <span className="flex items-center gap-1.5">
-          <SparklesIcon className="size-3.5" />
           AI budget
         </span>
         <span className={cn("num whitespace-nowrap font-medium", data.exhausted ? "text-risk-ink" : "text-ink")}>
