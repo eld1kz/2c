@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { ScenarioInput } from "@/lib/scenarios";
 
@@ -38,10 +38,11 @@ export const useInsights = () =>
   useQuery({ queryKey: keys.insights, queryFn: async () => unwrap(await api.GET("/insights")) });
 
 /** Before/after forecast for a scenario. A simulation: it writes nothing, so it is cached like a read. */
-export const useWhatIf = (scenarios: ScenarioInput[], enabled = true) =>
+export const useWhatIf = (scenarios: ScenarioInput[], enabled = true, keepPrevious = false) =>
   useQuery({
     queryKey: ["whatif", JSON.stringify(scenarios)],
     enabled: enabled && scenarios.length > 0,
+    placeholderData: keepPrevious ? keepPreviousData : undefined, // the playground: no flicker while a slider moves
     queryFn: async () => unwrap(await api.POST("/whatif", { body: { scenarios } })),
     retry: false,
   });

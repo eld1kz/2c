@@ -159,6 +159,8 @@ Each phase: plan mode → approve → implement → tests green → commit. Do n
 
 **6c-8 (Oct 20, final polish, frontend only, then freeze):** main navigation Today · Ask · Approvals · Team, everything else under a grouped More (Money, Records, Safety); Today trimmed to the greeting, chart, decisions, Can I afford it and the team row (safe to spend and spending moved to Overview); plainer copy ("Findings", "Who owes you", "3 things to decide", owner wording for finding types), "cushion" instead of "buffer" everywhere, no decorative sparkles or login illustration, four "What is this?" terms on Today.
 
+**6c-9 (Oct 20, last change before recording, frontend only):** CFO memo out of the navigation (route kept); What-if from the menu is a playground: six preset cards with a slider and/or date, up to three stacked, live re-runs of `POST /whatif`, the lowest point with Safe / Tight / Risky on top and "Compare ways to cover the gap" (`e2e/whatif.spec.ts`). Hard freeze after this.
+
 ## Phase 7 — Ship  *(Oct 18–20)*
 
 **Oct 19: deployment skipped for the submission.** The product runs locally: Postgres in Docker Compose, with the API and the web app on the host (README → Run it locally; checked from a fresh clone and an empty database). The production stack (`deploy/`, `scripts/deploy.sh`, `scripts/check_deploy.sh`, `scripts/fetch_evidence.sh`, the cron reset) stays in the repository, tested and ready to deploy. The committed evidence export comes from the local stack: live P1 (ends with a reset), then live P4 with `KEEP_STATE=1`, then `evidence_export`, `--verify-anchor` and `--check-file` (README → Execution evidence).

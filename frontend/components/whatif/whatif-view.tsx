@@ -14,8 +14,8 @@ import { parseScenarios } from "@/lib/scenarios";
 
 import { Assumptions } from "./assumptions";
 import { FinancingView } from "./financing-view";
+import { Playground } from "./playground";
 import { WhatIfChart, WhatIfLegend } from "./whatif-chart";
-import { WhatIfLinks } from "./whatif-links";
 import { WhatIfSummary, whatIfTitle } from "./whatif-summary";
 import { WhatIfTable } from "./whatif-table";
 
@@ -56,24 +56,12 @@ export function WhatIfView() {
     <div className="max-w-4xl space-y-5">
       <div>
         <p className="text-xs font-medium text-ink-3">Simulation · nothing in your books changes</p>
-        <h1 className="mt-1 text-[26px] leading-[1.2] font-semibold tracking-tight text-ink md:text-[30px]">{r ? whatIfTitle(r) : hasScenario ? "What if…" : "What-if and financing"}</h1>
+        <h1 className="mt-1 text-[26px] leading-[1.2] font-semibold tracking-tight text-ink md:text-[30px]">{r ? whatIfTitle(r) : hasScenario ? "What if…" : "What if…?"}</h1>
       </div>
 
       {viewer && <Problem>Simulations need an owner or accountant. Viewers can see the forecast on the overview.</Problem>}
       {scenarios === null && <Problem>This what-if link isn&apos;t valid. Start again from the overview or the chat.</Problem>}
-      {scenarios?.length === 0 && !viewer && (
-        <div className="space-y-3">
-          <p className="text-[15px] text-ink-2">Pick a scenario to compare with today&apos;s forecast, or ask the CFO to run one.</p>
-          <div className="flex flex-wrap gap-2">
-            <WhatIfLinks />
-            {!basis && (
-              <Button variant="secondary" size="sm" onClick={() => setFinancing("base")}>
-                <LandmarkIcon /> Compare financing for today&apos;s gap
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+      {scenarios?.length === 0 && !viewer && me.data && !basis && <Playground today={me.data.as_of} />}
       {result.isError && <Problem>{result.error.message}</Problem>}
 
       {scenarios && scenarios.length > 0 && !viewer && !result.isError && (

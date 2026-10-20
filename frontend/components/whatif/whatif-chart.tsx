@@ -81,7 +81,7 @@ export function WhatIfLegend({ buffer, currency }: { buffer: number; currency: s
         If the assumption holds (red: below your cushion)
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="w-4 border-t-2 border-dashed border-ink-2" aria-hidden /> {formatCents(buffer, currency, { dropZeroCents: true })} minimum buffer
+        <span className="w-4 border-t-2 border-dashed border-ink-2" aria-hidden /> {formatCents(buffer, currency, { dropZeroCents: true })} cushion
       </li>
     </ul>
   );

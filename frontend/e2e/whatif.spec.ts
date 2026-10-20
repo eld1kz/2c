@@ -100,3 +100,37 @@ test("a what-if in the chat renders as a before/after chart from the engine", as
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("What if Harbor Lane Café pays INV-1042?");
   expect(errors).toEqual([]);
 });
+
+test("what-if playground: presets, live sliders, three stacked scenarios, the engine's result on top", async ({ page }, info) => {
+  const errors = watchConsole(page);
+  await signIn(page, "owner");
+  await page.goto("/what-if");
+  const presets = page.getByRole("region", { name: "Scenarios to try" });
+  for (const p of ["Hire someone", "Give a raise", "Buy equipment", "A customer pays late", "Lose a customer", "Harbor Lane pays"]) {
+    await expect(presets.getByRole("button", { name: p })).toBeEnabled();
+  }
+  await presets.getByRole("button", { name: "Hire someone" }).click();
+  const lowest = page.getByTestId("playground-lowest");
+  await expect(lowest).toHaveText(/^Lowest point: .+, \$[\d,]+\.\d\d below your cushion$/);
+  await expect(page.getByTestId("playground-result")).toContainText("Risky");
+  const first = await lowest.textContent();
+  await page.getByLabel("Hire someone: Pay per month").fill("6000"); // the chart and result follow the slider
+  await expect(lowest).not.toHaveText(first ?? "");
+
+  await presets.getByRole("button", { name: "Harbor Lane pays" }).click();
+  await presets.getByRole("button", { name: "Buy equipment" }).click();
+  const stack = page.getByRole("list", { name: "Your scenarios" }).getByRole("listitem");
+  await expect(stack).toHaveCount(3);
+  await expect(stack.getByText("Assumption", { exact: true })).toHaveCount(3);
+  await expect(presets.getByRole("button", { name: "Give a raise" })).toBeDisabled(); // three at most
+  await expect(page.getByRole("region", { name: "Assumption, not a recorded fact" })).toContainText("Harbor Lane Café pays");
+  await expect(page.getByRole("link", { name: "Compare ways to cover the gap" })).toHaveAttribute("href", /\/what-if\?s=.*collect_receivable.*&view=financing$/);
+
+  await stack.first().getByRole("button", { name: "Remove Hire someone" }).click();
+  await expect(stack).toHaveCount(2);
+  await expect(presets.getByRole("button", { name: "Give a raise" })).toBeEnabled();
+  await expect(page.getByRole("region", { name: "Assumption, not a recorded fact" })).not.toContainText("new monthly cost"); // the result follows
+  await page.screenshot({ path: `e2e/.results/playground-${info.project.name}.png`, fullPage: true });
+  expect(await noSideScroll(page)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});

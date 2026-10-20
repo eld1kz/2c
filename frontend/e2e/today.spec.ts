@@ -89,7 +89,7 @@ test("viewer sees the decisions but no buttons", async ({ page }) => {
 
 test("navigation is Today, Ask, Approvals, Team and a grouped More", async ({ page }, info) => {
   await signIn(page, "owner");
-  const groups = { Money: ["Overview", "Findings", "What-if", "Paperwork", "CFO memo"], Records: ["Transactions", "Import"], Safety: ["Audit log", "Trust"] };
+  const groups = { Money: ["Overview", "Findings", "What-if", "Paperwork"], Records: ["Transactions", "Import"], Safety: ["Audit log", "Trust"] };
   let nav;
   if (info.project.name === "phone") {
     const bar = page.getByRole("navigation", { name: "Main" }).last();
