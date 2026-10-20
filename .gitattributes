@@ -1,0 +1,2 @@
+# Evidence files are hashed byte for byte (anchor.json export_sha256): never convert line endings.
+evidence/** -text

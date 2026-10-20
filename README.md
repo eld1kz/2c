@@ -20,7 +20,7 @@ Nothing is paid or sent until a person approves it, and every step lands in a ha
 
 Docs: [architecture](docs/architecture.md) · [security self-assessment](docs/security-assessment.md) ·
 [threat model](docs/threat-model.md) · [test cases](docs/test-cases.md) · [spec](SPEC.md) ·
-[build phases](docs/phases/PHASES.md) · [demo video](demo/README.md)
+[build phases](docs/phases/PHASES.md) · [demo video](https://drive.google.com/file/d/1w9BWLluIEkJe_x1LIjqv9MSpsIcxy-RK/view?usp=sharing)
 
 ## Demo
 
@@ -41,14 +41,13 @@ $2), so it can answer "budget used up" after heavy use.
 
 ### Demo video
 
+**Watch it: [ledgerwise-demo.mp4 on Google Drive](https://drive.google.com/file/d/1w9BWLluIEkJe_x1LIjqv9MSpsIcxy-RK/view?usp=sharing)** (2 min 13 s).
+
 A 2-minute walkthrough of every screen (sign-in, Today with an approval and its impact preview,
 Overview, Insights, What-if and financing, Ask the CFO, Approvals, CFO memo, Paperwork, Team,
 Transactions, Import with the Plaid sandbox sync, Audit log, Trust) is recorded from a script, so it
 can be re-recorded after any UI change: `demo/record.sh` → `demo/out/ledgerwise-demo.mp4`
 (git-ignored). How to install the recorder and edit the scenes: [demo/README.md](demo/README.md).
-
-> **Needs input from the team:** link to the published demo video (YouTube, Bilibili or a drive
-> link reviewers in mainland China can open). Until then, record it locally with `demo/record.sh`.
 
 ### A 5-minute tour
 
