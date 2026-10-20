@@ -339,9 +339,6 @@ owns the design decisions, the scope, and what was cut.
 Copyright (c) 2026 Eldar Ugay and team. All rights reserved. Source provided for competition review.
 See [LICENSE](LICENSE).
 
-> **Needs input from the team:** the full list of team members (names as registered for the
-> competition), for this line and `LICENSE`.
-
 Third-party dependencies keep their own licenses. As checked on Oct 18, 2026, they are mostly MIT,
 BSD, Apache-2.0 and ISC, with no GPL or AGPL. The exceptions: `psycopg` and the `libvips` binaries
 bundled with `sharp` are LGPL-3.0, used unmodified as libraries; `certifi` is MPL-2.0;
