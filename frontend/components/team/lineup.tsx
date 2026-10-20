@@ -5,7 +5,7 @@ import { PlusIcon } from "lucide-react";
 import { Money } from "@/components/money";
 import { cn } from "@/lib/cn";
 
-import { Character, HIRE_LOOK, LOOKS, Silhouette, kindFor } from "./character";
+import { Character, HIRE_LOOK, LOOKS, Silhouette } from "./character";
 
 type Person = { name: string; role: string; weekly_pay_cents?: number | null };
 
@@ -27,7 +27,7 @@ export function Lineup({ people, size, onSelect, hire }: {
   const w = SIZE[size];
   const lg = size === "lg";
   const slots = people.length + (hire ? 1 : 0);
-  const preview = hire && hire.role.trim() && kindFor(hire.role) !== "generic" ? hire.role.trim() : null;
+  const preview = hire && hire.role.trim() ? hire.role.trim() : null; // any typed role becomes a character
 
   const figure = (node: React.ReactNode) => (
     <span className="block motion-safe:group-hover:animate-[lw-bob_1.4s_ease-in-out_infinite]">{node}</span>

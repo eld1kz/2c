@@ -84,7 +84,7 @@ test("navigation is Today, Ask, Approvals and More", async ({ page }, info) => {
   if (info.project.name === "phone") {
     const bar = page.getByRole("navigation", { name: "Main" }).last();
     await expect(bar.getByRole("link")).toHaveText(["Today", "Ask", "Approvals"]);
-    await bar.getByRole("button", { name: "More" }).click();
+    await bar.getByRole("button", { name: "More", exact: true }).click();
     const more = page.getByRole("navigation", { name: "More" });
     for (const label of ["Overview", "Insights", "What-if", "Paperwork", "CFO memo", "Transactions", "Import", "Audit log"]) {
       await expect(more.getByRole("link", { name: label })).toBeVisible();
@@ -120,9 +120,16 @@ test("can I afford it: a chip asks, both engine verdicts (today, with Today's fi
   await expect(box.getByRole("textbox", { name: "Can I afford it?" })).toHaveAttribute("placeholder", "Hire a barista at $2,500/month from November?");
   await box.getByRole("button", { name: "Hire a barista at $2,500/month from November?" }).click();
   const result = box.getByTestId("afford-result");
-  const lines = result.getByRole("list", { name: "Verdicts" }).getByRole("listitem");
-  await expect(lines).toHaveText(["Today: No — already short from Nov 5",
-    "If Verde Green Coffee Imports agrees and Harbor Lane Café pays: Not yet — safe from Dec 6"]);
+  // advice, not a gate: risk levels, what happens if you go ahead anyway, and how to make it work
+  await expect(result.getByRole("list", { name: "Verdicts" }).getByRole("listitem")).toHaveText(["Today: Risky — already short from Nov 5"]);
+  await expect(result.getByRole("region", { name: "If you go ahead anyway" }).getByTestId("go-ahead"))
+    .toHaveText(/^Lowest point: Nov 26, \$[\d,]+\.\d\d below your cushion\.$/); // the engine's what-if (POST /whatif)
+  const howTo = result.getByRole("region", { name: "How to make it work" });
+  await expect(howTo.getByRole("list", { name: "With today's fixes" }).getByRole("listitem"))
+    .toHaveText(["If Verde Green Coffee Imports agrees and Harbor Lane Café pays: Tight — safe from Dec 6"]);
+  await expect(howTo.getByRole("link", { name: "Compare ways to cover the gap" })).toHaveAttribute("href", /\/what-if\?s=.*add_recurring.*&view=financing$/);
+  await expect(result).toContainText("This is advice. You decide.");
+  await expect(result.getByText(/^(No|Not yet|Yes)$/)).toHaveCount(0); // no hard verdict badges
   await expect(result).toContainText("falls below your $5,000.00 cushion");
   await expect(result.getByRole("button", { name: "Week 6 (Nov 5)" })).toBeVisible();
   await expect(result.getByRole("region", { name: "What-if result" })).toBeVisible();

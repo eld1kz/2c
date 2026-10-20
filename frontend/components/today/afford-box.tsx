@@ -1,30 +1,32 @@
 "use client";
 
-import { LoaderCircleIcon } from "lucide-react";
+import { LandmarkIcon, LoaderCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Answer } from "@/components/chat/answer";
 import { WhatIfPanel } from "@/components/whatif/whatif-panel";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
-import { useAfford } from "@/lib/api/hooks";
+import { useAfford, useWhatIf } from "@/lib/api/hooks";
 import type { components } from "@/lib/api/schema";
-import { formatDay } from "@/lib/money";
-import type { ScenarioInput } from "@/lib/scenarios";
+import { formatCents, formatDay } from "@/lib/money";
+import { whatIfHref, type ScenarioInput } from "@/lib/scenarios";
 import { Help } from "@/components/glossary/help";
 
 const EXAMPLES = ["Hire a barista at $2,500/month from November?", "Give staff a 3% raise?", "Buy a $3,000 espresso machine?"];
 
+// Advice, not a gate: the engine's verdict as a risk level, always with the word (never colour alone).
 const VERDICT: Record<string, { label: string; cls: string }> = {
-  yes: { label: "Yes", cls: "bg-good-soft text-good-ink" },
-  not_yet: { label: "Not yet", cls: "bg-attn-soft text-attn-ink" },
-  no: { label: "No", cls: "bg-risk-soft text-risk-ink" },
+  yes: { label: "Safe", cls: "bg-good-soft text-good-ink" },
+  not_yet: { label: "Tight", cls: "bg-attn-soft text-attn-ink" },
+  no: { label: "Risky", cls: "bg-risk-soft text-risk-ink" },
 };
 
 type Afford = components["schemas"]["AffordOut"];
 type Fix = components["schemas"]["AffordFixOut"];
 
-/** "Yes from Nov 1" · "Not yet: safe from Dec 6" · "No: already short from Nov 5". */
+/** "Safe — from Nov 1" · "Tight — safe from Dec 6" · "Risky — already short from Nov 5". */
 function detail(verdict: string, requested: string | null | undefined, earliest: string | null | undefined,
   shortFrom: string | null | undefined): string {
   if (verdict === "yes") return requested ? `from ${formatDay(requested)}` : "";
@@ -46,22 +48,55 @@ function VerdictLine({ label, verdict, text }: { label: string; verdict: string;
   );
 }
 
+const block = "space-y-1.5 border-t border-line pt-3";
+const heading = "text-[13px] font-semibold text-ink";
+
+/** What happens if the owner goes ahead regardless: the lowest week of the engine's what-if (POST /whatif). */
+function GoAhead({ scenarios }: { scenarios: ScenarioInput[] }) {
+  const w = useWhatIf(scenarios, scenarios.length > 0);
+  const gap = w.data?.scenario_gap;
+  const low = gap ? w.data?.weeks[gap.low_week - 1] : undefined;
+  return (
+    <section className={block} aria-label="If you go ahead anyway">
+      <p className={heading}>If you go ahead anyway:</p>
+      <p className="text-ink-2" data-testid="go-ahead">
+        {!w.data ? "Working out your lowest week…"
+          : gap && low ? `Lowest point: ${formatDay(low.start)}, ${formatCents(gap.amount_cents, w.data.currency)} below your cushion.`
+            : "Cash stays above your cushion in every week."}
+      </p>
+    </section>
+  );
+}
+
 function Verdicts({ r }: { r: Afford }) {
   if (!r.verdict) return null;
   const fixed = r.with_fixes;
+  const scenarios = r.scenarios as ScenarioInput[];
   return (
-    <div className="space-y-1.5 text-sm">
+    <div className="space-y-3 text-sm">
       <ul className="space-y-1.5" aria-label="Verdicts">
         <VerdictLine label="Today" verdict={r.verdict} text={detail(r.verdict, r.requested_start, r.earliest_safe_start, r.short_from)} />
-        {fixed && (
-          <VerdictLine label={ifFixes(fixed.fixes)} verdict={fixed.verdict}
-            text={detail(fixed.verdict, r.requested_start, fixed.earliest_safe_start, fixed.short_from)} />
-        )}
       </ul>
+      {scenarios.length > 0 && <GoAhead scenarios={scenarios} />}
+      <section className={block} aria-label="How to make it work">
+        <p className={heading}>How to make it work:</p>
+        {fixed && (
+          <ul className="space-y-1.5" aria-label="With today's fixes">
+            <VerdictLine label={ifFixes(fixed.fixes)} verdict={fixed.verdict}
+              text={detail(fixed.verdict, r.requested_start, fixed.earliest_safe_start, fixed.short_from)} />
+          </ul>
+        )}
+        {scenarios.length > 0 && (
+          <Button asChild variant="secondary" size="sm">
+            <Link href={whatIfHref(scenarios, "financing")}><LandmarkIcon /> Compare ways to cover the gap</Link>
+          </Button>
+        )}
+      </section>
       <p className="text-xs text-ink-3">
         From your 13-week forecast <Help term="forecast" />. Safe means no week ends below your cushion <Help term="cushion" />.
-        {fixed && " The second line assumes the actions prepared on Today work out; nothing is sent until you approve it."}
+        {fixed && " The fixes line assumes the actions prepared on Today work out; nothing is sent until you approve it."}
       </p>
+      <p className="text-[13px] font-medium text-ink-2">This is advice. You decide.</p>
     </div>
   );
 }

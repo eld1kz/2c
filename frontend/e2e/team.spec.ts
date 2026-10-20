@@ -40,10 +40,13 @@ test("the team, the Today line, and a raise opening Can I afford it with both ve
   await people.nth(3).getByRole("button", { name: "Give a raise" }).click();
   await people.nth(3).getByRole("button", { name: "Can I afford it?" }).click();
   const box = page.getByRole("region", { name: "Can I afford it?" });
-  await expect(box.getByRole("list", { name: "Verdicts" }).getByRole("listitem")).toHaveText([
-    "Today: No — already short from Nov 5",
-    "If Verde Green Coffee Imports agrees and Harbor Lane Café pays: Yes — from Oct 1",
+  await expect(box.getByRole("list", { name: "Verdicts" }).getByRole("listitem")).toHaveText(["Today: Risky — already short from Nov 5"]);
+  await expect(box.getByRole("list", { name: "With today's fixes" }).getByRole("listitem")).toHaveText([
+    "If Verde Green Coffee Imports agrees and Harbor Lane Café pays: Safe — from Oct 1",
   ]);
+  await expect(box.getByTestId("go-ahead")).toHaveText(/^Lowest point: .+ below your cushion\.$/);
+  await expect(box.getByRole("link", { name: "Compare ways to cover the gap" })).toBeVisible();
+  await expect(box).toContainText("This is advice. You decide.");
   expect(asked).toEqual(["Give Tom Lindqvist (Barista) a raise of $50.00/week from today?"]);
   await expect(box.getByRole("textbox")).toHaveValue(asked[0]);
   await page.screenshot({ path: `e2e/.results/team-${info.project.name}.png`, fullPage: true });
@@ -79,7 +82,7 @@ test("viewers see names and roles but no pay and no buttons", async ({ page }) =
 test("Team is under More", async ({ page }, info) => {
   await signIn(page, "owner");
   if (info.project.name === "phone") {
-    await page.getByRole("navigation", { name: "Main" }).last().getByRole("button", { name: "More" }).click();
+    await page.getByRole("navigation", { name: "Main" }).last().getByRole("button", { name: "More", exact: true }).click();
     await expect(page.getByRole("navigation", { name: "More" }).getByRole("link", { name: "Team" })).toBeVisible();
   } else {
     await expect(page.getByRole("navigation", { name: "Main" }).first().getByRole("link", { name: "Team" })).toBeVisible();
@@ -140,4 +143,18 @@ test("the characters bob on hover, but not with reduced motion", async ({ page }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await tom.hover();
   expect(await anim()).toBe("none");
+});
+
+test("any role gets a character, and the list cards use the same illustrations", async ({ page }) => {
+  await signIn(page, "owner");
+  await page.goto("/team");
+  const list = page.getByRole("list", { name: "Team" });
+  await expect(list.getByRole("img", { name: "Illustration of Priya, barista lead" })).toBeVisible();
+  await expect(list.getByText(/^(MO|DR|PN|TL|AT)$/)).toHaveCount(0); // no initials avatars
+  const photo = page.getByRole("region", { name: "Team photo" });
+  const role = page.getByLabel("Role", { exact: true });
+  for (const r of ["Software developer", "Delivery driver", "Cleaner", "Florist"]) {
+    await role.fill(r);
+    await expect(photo.getByRole("img", { name: `Preview: illustration of a new ${r.toLowerCase()}` })).toBeVisible();
+  }
 });

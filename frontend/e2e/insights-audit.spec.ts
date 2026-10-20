@@ -47,7 +47,7 @@ test("a broken chain is reported with the event where it breaks", async ({ page 
 test("phones reach the audit log through More", async ({ page }, info) => {
   test.skip(info.project.name !== "phone", "the More menu is phone-only");
   await signIn(page, "owner");
-  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("dialog").getByRole("link", { name: "Audit log" }).click();
   await expect(page.getByRole("heading", { name: "Audit log", level: 1 })).toBeVisible();
 });

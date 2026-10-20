@@ -4,7 +4,7 @@
  * roster, so the people differ without any extra data. Decorative illustration only: no figures.
  */
 
-export type Kind = "barista" | "roaster" | "baker" | "cashier" | "manager" | "packer" | "generic";
+export type Kind = "barista" | "roaster" | "baker" | "cashier" | "manager" | "packer" | "tech" | "driver" | "cleaner" | "generic";
 type Hair = "short" | "bun" | "long" | "curly" | "bob";
 
 export type Look = { skin: string; hair: string; hairStyle: Hair; height: number; shirt: string; trousers: string; shoes: string; accent: string };
@@ -19,9 +19,13 @@ export const LOOKS: Look[] = [
 ];
 export const HIRE_LOOK: Look = { skin: "#a86b45", hair: "#4a3426", hairStyle: "short", height: 0.93, shirt: "#7c6aa8", trousers: "#2f3a4f", shoes: "#2a2a2a", accent: "#5b4a8a" };
 
-/** "Head roaster" → roaster, "Barista lead" → barista, "Packing and shipping" → packer; anything else → generic. */
+/** "Head roaster" → roaster, "Barista lead" → barista, "Packing and shipping" → packer, "Developer" → tech
+ *  (laptop), "Delivery driver" → driver (keys), "Cleaner" → cleaner (apron); anything else → generic. */
 export function kindFor(role: string): Kind {
   const r = role.toLowerCase();
+  if (/program|develop|software|engineer|\bit\b|tech/.test(r)) return "tech";
+  if (/driv|deliver|courier/.test(r)) return "driver";
+  if (/clean|janitor|housekeep/.test(r)) return "cleaner";
   if (r.includes("barista")) return "barista";
   if (r.includes("roast")) return "roaster";
   if (r.includes("bak") || r.includes("pastry")) return "baker";
@@ -66,7 +70,7 @@ function Hat({ kind, look }: { kind: Kind; look: Look }) {
       </g>
     );
   }
-  if (kind === "roaster" || kind === "packer") {
+  if (kind === "roaster" || kind === "packer" || kind === "driver") {
     return (
       <g fill={look.accent}>
         <path d="M39.5 44 Q39 27 60 27 Q81 27 80.5 44 Z" />
@@ -111,6 +115,23 @@ function Prop({ kind }: { kind: Kind }) {
           <path d="M51 109 l4 5 M58 107 l4 6 M65 108 l4 5" stroke="#f2cf96" strokeWidth="1.6" strokeLinecap="round" />
         </g>
       );
+    case "tech":
+      return (
+        <g>
+          <path d="M42 120 h36 l4 6 h-44 z" fill="#9aa3b5" />
+          <rect x="45" y="97" width="30" height="23" rx="2" fill="#34405a" />
+          <rect x="47.5" y="99.5" width="25" height="18" rx="1" fill="#cfe0ff" />
+          <circle cx="60" cy="108.5" r="2.2" fill="#2b4bcf" />
+        </g>
+      );
+    case "driver":
+      return (
+        <g>
+          <circle cx="69" cy="122" r="4.5" fill="none" stroke="#b7791f" strokeWidth="1.8" />
+          <path d="M66 126 l-3 9 l3 1 l1 -3 l2 0" fill="none" stroke="#9aa3b5" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M72 126 l2 8 l2 -0.5" fill="none" stroke="#c0c7d4" strokeWidth="2" />
+        </g>
+      );
     case "manager":
       return (
         <g>
@@ -127,8 +148,8 @@ function Prop({ kind }: { kind: Kind }) {
 
 /** One standing person, feet on y=214 of a 120×220 box; `height` scales them from the floor. */
 export function Figure({ look, kind, lead }: { look: Look; kind: Kind; lead?: boolean }) {
-  const holds = kind !== "cashier" && kind !== "generic";
-  const apron = kind === "barista" || kind === "baker" || (kind === "roaster" && lead);
+  const holds = kind !== "cashier" && kind !== "generic" && kind !== "cleaner";
+  const apron = kind === "barista" || kind === "baker" || kind === "cleaner" || (kind === "roaster" && lead);
   const apronColor = kind === "baker" ? "#ffffff" : look.accent;
   const top = kind === "manager" ? "#34405a" : kind === "cashier" ? look.accent : look.shirt;
   return (
@@ -188,8 +209,17 @@ export function Figure({ look, kind, lead }: { look: Look; kind: Kind; lead?: bo
   );
 }
 
-/** A labelled standing character ("Illustration of Tom, barista"), `width` px wide. */
-export function Character({ look, role, label, width }: { look: Look; role: string; label: string; width: number }) {
+/** A labelled standing character ("Illustration of Tom, barista"), `width` px wide; `crop="head"` gives a
+ *  square head-and-shoulders avatar (the crop follows the character's height). */
+export function Character({ look, role, label, width, crop }: { look: Look; role: string; label: string; width: number; crop?: "head" }) {
+  if (crop === "head") {
+    const headY = 214 - (214 - 52) * look.height; // the head centre after scaling from the floor
+    return (
+      <svg viewBox={`16 ${headY - 40} 88 88`} width={width} height={width} role="img" aria-label={label}>
+        <Figure look={look} kind={kindFor(role)} lead={isLead(role)} />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 120 220" width={width} height={(width * 220) / 120} role="img" aria-label={label}>
       <ellipse cx="60" cy="214" rx="27" ry="4" fill={INK} fillOpacity="0.08" />

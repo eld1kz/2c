@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 const PASSWORD = process.env.DEMO_PASSWORD ?? "emberoak-demo";
 
@@ -15,7 +15,10 @@ export async function signIn(page: Page, role: "owner" | "accountant" | "viewer"
   await page.getByLabel("Email").fill(`${role}@emberoak.demo`);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL("**/today");
+  await page.waitForURL("**/today", { waitUntil: "commit" });
+  // Today renders client-side only, so its heading means the page is hydrated and its data loaded
+  // (more reliable than the window "load" event, which sometimes stalled under parallel load).
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 30_000 });
 }
 
 export async function noSideScroll(page: Page): Promise<number> {

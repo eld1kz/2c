@@ -115,10 +115,12 @@ export function TeamView() {
       </Sheet>
 
       <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface" aria-label="Team">
-        {data.people.map((p) => (
+        {data.people.map((p, i) => (
           <li key={p.name} className="space-y-3 px-5 py-4 md:px-6">
             <div className="flex items-center gap-4">
-              <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-soft font-display text-[15px] font-medium text-brand-ink">{p.initials}</span>
+              <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-soft">
+                <Character look={LOOKS[i % LOOKS.length]} role={p.role} label={illustrationLabel(p)} width={48} crop="head" />
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-medium text-ink">{p.name}</span>
                 <span className="block text-sm text-ink-2">{p.role}</span>

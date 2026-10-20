@@ -16,7 +16,7 @@ test("owner resets the demo behind a confirm dialog", async ({ page }, info) => 
   const reset = page.getByRole("button", { name: "Reset demo data" }).first();
   const open = async () => {
     // on phones it lives in the More menu, which stays open after Cancel
-    if (info.project.name === "phone" && !(await reset.isVisible())) await page.getByRole("button", { name: "More" }).click();
+    if (info.project.name === "phone" && !(await reset.isVisible())) await page.getByRole("button", { name: "More", exact: true }).click();
     await reset.click();
   };
   await open();
@@ -34,6 +34,6 @@ test("owner resets the demo behind a confirm dialog", async ({ page }, info) => 
 
 test("only the owner sees the reset", async ({ page }, info) => {
   await signIn(page, "accountant");
-  if (info.project.name === "phone") await page.getByRole("button", { name: "More" }).click();
+  if (info.project.name === "phone") await page.getByRole("button", { name: "More", exact: true }).click();
   await expect(page.getByRole("button", { name: "Reset demo data" })).toHaveCount(0);
 });
